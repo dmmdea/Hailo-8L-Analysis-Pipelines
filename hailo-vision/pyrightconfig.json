@@ -1,0 +1,22 @@
+{
+  "pythonPath": "/home/dmmdea/openclaw-venvs/hailo/bin/python",
+  "venvPath": "/home/dmmdea/openclaw-venvs",
+  "venv": "hailo",
+  "pythonVersion": "3.12",
+  "include": ["*.py", "tests/**/*.py"],
+  "extraPaths": ["/home/dmmdea/openclaw-mcp-servers/_shared"],
+  "executionEnvironments": [
+    {
+      "root": "tests",
+      "extraPaths": [
+        ".",
+        "/home/dmmdea/openclaw-mcp-servers/_shared",
+        "/home/dmmdea/openclaw-mcp-servers/hailo-vision"
+      ]
+    },
+    {
+      "root": ".",
+      "extraPaths": ["/home/dmmdea/openclaw-mcp-servers/_shared"]
+    }
+  ]
+}

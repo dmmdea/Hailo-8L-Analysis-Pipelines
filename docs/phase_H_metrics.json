@@ -1,0 +1,12 @@
+{
+  "first_call_ms": 8010.15,
+  "second_call_ms": 7.56,
+  "speedup": 1060.17,
+  "feature_keys": 54,
+  "model_version": "f774afa6d0436d2c035940de3f0c3734f6e8ac1e2bd3fd9cba7976bbea21bc76",
+  "pipeline_version": "v0.1.0",
+  "backend": "HailoRuntime",
+  "rows_total": 1,
+  "image_path": "/home/dmmdea/openclaw-output/youtube-analyst/thumbnails/al_vazquez/-Maf601rtkk.jpg",
+  "image_size_bytes": 103903
+}

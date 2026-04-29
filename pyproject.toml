@@ -1,0 +1,53 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "openclaw-hailo"
+version = "0.1.0"
+description = "Hailo-8L NPU lane for the OpenClaw YouTube analyst pipeline: hailo-vision MCP, content-addressed Vision Cache (Phase H), and the maybe_hailo_backend factory."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "Daniel" },
+]
+keywords = ["hailo", "hailo-8l", "npu", "edge-inference", "youtube", "computer-vision", "openclaw", "mcp"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+# Runtime deps are deliberately minimal. The Vision Cache (the core of this
+# package) needs only the standard library + an optional pyarrow when CLIP
+# embeddings cross the cache boundary. The hailo-vision MCP itself imports
+# hailort + opencv at runtime — those are installed via the Hailo apps-
+# infrastructure deb + a dedicated venv; not declared here so this package
+# stays installable on a Hailo-less control host (e.g., for unit tests).
+dependencies = []
+
+[project.optional-dependencies]
+embeddings = ["pyarrow>=14"]
+dev = [
+    "pytest>=7",
+    "pyarrow>=14",
+]
+
+[project.urls]
+Homepage = "https://github.com/dmmdea/hailo-youtube-stack-mcp"
+Repository = "https://github.com/dmmdea/hailo-youtube-stack-mcp"
+"Sibling Repo" = "https://github.com/dmmdea/OpenClaw-Youtube-Analyst-Skills"
+
+[tool.hatch.build.targets.wheel]
+# PEP 420 namespace package — `openclaw_shared/` carries no top-level
+# __init__.py so this repo's subpackages (cache/, backends/) can coexist
+# with sibling repos that contribute other openclaw_shared.* modules.
+packages = ["openclaw_shared/cache", "openclaw_shared/backends"]
