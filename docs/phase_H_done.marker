@@ -1,0 +1,39 @@
+Phase H — Content-addressed Vision Cache — DONE 2026-04-28
+
+Module:   openclaw_shared/cache/vision_cache.py (220 LoC)
+__init__: openclaw_shared/cache/__init__.py (re-exports)
+Wiring:   openclaw_shared/features/thumbnail.py (cache kwarg, backwards-compatible)
+
+Tests (all green on Dell live device venv):
+  - tests/test_vision_cache.py            24 tests
+  - tests/test_thumbnail_cache_wiring.py   7 tests
+  - tests/test_thumbnail_features.py      11 tests (regression)
+  - tests/test_thumbnail_ocr_mode_env.py   3 tests (regression)
+  -------------------------------------------------
+  Total                                   45 tests, 45 passed
+
+Live integration (tests/live_phase_h_check.py against /dev/hailo0):
+  - First call (cold cache):  8010.2 ms  (full Hailo pipeline)
+  - Second call (warm cache):    7.6 ms  (SQLite + Parquet read)
+  - Speedup:                  1060.2x
+  - Embedding round-trip via Parquet sidecar: verified
+  - Model-version bump invalidates cache: verified
+  - Pipeline-version bump invalidates cache: verified
+
+Storage layout (default cache_dir = ~/openclaw-output/hailo-vision-cache/):
+  - cache.db          SQLite, table vision_facts(content_hash, model_version,
+                      pipeline_version) PRIMARY KEY (content_hash, model_version,
+                      pipeline_version)
+  - embeddings.parquet  pyarrow sidecar; CLIP 512-d vectors keyed by content_hash
+
+Side fixes shipped under Phase H:
+  - hailo_runtime.DEFAULT_MODELS_DIR moved /mnt/ai/hailo/models -> /home/hailo/models
+    (matches HailoRT apps-infrastructure deb-provisioned location). HAILO_MODELS_DIR
+    env override no longer required for default install.
+  - HAILO_MAXIMUM_CAPABILITY_PLAN.md gets a top-of-file note about the path move.
+
+Metrics: phase_H_metrics.json (computed during live integration).
+
+Unblocks: Phase I (Shorts frame selector), Phase J (long-form thumbnail validator),
+Phase K (300-500 benchmark expansion). Each can read previously-computed vision
+facts via VisionCache instead of re-running Hailo.
