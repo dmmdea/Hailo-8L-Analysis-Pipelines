@@ -1,0 +1,1326 @@
+{
+  "n_videos_in_gt": 90,
+  "n_videos_in_pred": 90,
+  "n_joined": 90,
+  "missing_predictions": [],
+  "unexpected_predictions": [],
+  "entity_scores": {
+    "brand": {
+      "precision": 1.0,
+      "recall": 0.3871,
+      "f1": 0.5581,
+      "tp": 24,
+      "fp": 0,
+      "fn": 38
+    },
+    "model": {
+      "precision": 0.6818,
+      "recall": 0.5357,
+      "f1": 0.6,
+      "tp": 15,
+      "fp": 7,
+      "fn": 13
+    },
+    "year": {
+      "precision": 1.0,
+      "recall": 0.6522,
+      "f1": 0.7895,
+      "tp": 15,
+      "fp": 0,
+      "fn": 8
+    },
+    "kw:powertrain": {
+      "precision": 1.0,
+      "recall": 0.4286,
+      "f1": 0.6,
+      "tp": 3,
+      "fp": 0,
+      "fn": 4
+    },
+    "kw:category": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 1
+    },
+    "kw:review_format": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "tp": 12,
+      "fp": 0,
+      "fn": 0
+    },
+    "kw:superlative": {
+      "precision": 1.0,
+      "recall": 0.6,
+      "f1": 0.75,
+      "tp": 3,
+      "fp": 0,
+      "fn": 2
+    },
+    "kw:freshness": {
+      "precision": 1.0,
+      "recall": 0.75,
+      "f1": 0.8571,
+      "tp": 3,
+      "fp": 0,
+      "fn": 1
+    }
+  },
+  "text_scores": {
+    "strict": {
+      "n": 78,
+      "cer": 0.4915,
+      "wer": 0.8627
+    },
+    "lenient_nocase_noaccent": {
+      "n": 78,
+      "cer": 0.4628,
+      "wer": 0.8444
+    }
+  },
+  "anchor_detail": {
+    "Ao-QVHnFlmo": {
+      "video_id": "Ao-QVHnFlmo",
+      "channel": "target_channel",
+      "brand_miss": [
+        "hyundai",
+        "vw"
+      ],
+      "brand_fp": [],
+      "model_miss": [
+        "id buzz",
+        "ioniq"
+      ],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "¡MEJORES CARROS ELÉCTRICOS 2026! IONIQ 9 SUBARU UNCHARTED VW ID BUZZ",
+      "pred_text_corrected": ": MEJORES CARROS ELECTRCOS2026 ! UNCHARTED o SUBARU IDBUZ"
+    },
+    "8nP7NrrmTxU": {
+      "video_id": "8nP7NrrmTxU",
+      "channel": "target_channel",
+      "brand_miss": [
+        "chevrolet"
+      ],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "¿ESTO ES ENTRY LEVEL?",
+      "pred_text_corrected": "CESTOESELIRYLEVEP"
+    }
+  },
+  "per_video": [
+    {
+      "video_id": "8nP7NrrmTxU",
+      "channel": "target_channel",
+      "brand_miss": [
+        "chevrolet"
+      ],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "¿ESTO ES ENTRY LEVEL?",
+      "pred_text_corrected": "CESTOESELIRYLEVEP"
+    },
+    {
+      "video_id": "Ao-QVHnFlmo",
+      "channel": "target_channel",
+      "brand_miss": [
+        "hyundai",
+        "vw"
+      ],
+      "brand_fp": [],
+      "model_miss": [
+        "id buzz",
+        "ioniq"
+      ],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "¡MEJORES CARROS ELÉCTRICOS 2026! IONIQ 9 SUBARU UNCHARTED VW ID BUZZ",
+      "pred_text_corrected": ": MEJORES CARROS ELECTRCOS2026 ! UNCHARTED o SUBARU IDBUZ"
+    },
+    {
+      "video_id": "Aox2tWDpIs4",
+      "channel": "target_channel",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "TESLA VS CADILLAC",
+      "pred_text_corrected": "TESLA VS CADILLAC"
+    },
+    {
+      "video_id": "BUk2ybi9_AM",
+      "channel": "target_channel",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "¿CUÁL ES LA MEJOR SUV HÍBRIDA 2026? FORESTER HÍBRIDA (SUBARU) PALISADE HÍBRIDA (HYUNDAI)",
+      "pred_text_corrected": ": CUALESLAMEJOR SUVHBRDA20262 PALISADE FORESTERHBRIDA PALSADEHBRIDA ( SUBARU ) ( HYUNDAI )"
+    },
+    {
+      "video_id": "DcpVp-S4Vqo",
+      "channel": "target_channel",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "chévere que si lo activo en nivel tres",
+      "pred_text_corrected": "00 0 . 0 aaa chevere auge silo activoennivel tres"
+    },
+    {
+      "video_id": "INf-KiWdB6I",
+      "channel": "target_channel",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "TIPO Híbrido Economía comb. (modo Híbrido) 32.4 0.0",
+      "pred_text_corrected": "0 . 0 THPO"
+    },
+    {
+      "video_id": "KlGmOL3p2vA",
+      "channel": "target_channel",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "¡SUPER AUTOS! CHICAGO AUTO SHOW",
+      "pred_text_corrected": "SUPER AUTOS !"
+    },
+    {
+      "video_id": "P36Y89B7Ua4",
+      "channel": "target_channel",
+      "brand_miss": [
+        "honda"
+      ],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "Motocompacto HONDA Portable: Body folds neatly Reliable 15 12 Y queda",
+      "pred_text_corrected": "hatocompacto JOA Rolioble fONDA cauda"
+    },
+    {
+      "video_id": "QBokPMS3NO4",
+      "channel": "target_channel",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [
+        2026
+      ],
+      "year_fp": [],
+      "gt_text": "CHICAGO AUTO SHOW #CAS2026",
+      "pred_text_corrected": "★ ★"
+    },
+    {
+      "video_id": "RBiTM20BAc4",
+      "channel": "target_channel",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "TIENE UN PRECIO",
+      "pred_text_corrected": "TENEUN PRECO"
+    },
+    {
+      "video_id": "SlKlEZ5M6Z0",
+      "channel": "target_channel",
+      "brand_miss": [
+        "chevrolet",
+        "ford"
+      ],
+      "brand_fp": [],
+      "model_miss": [
+        "bronco"
+      ],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "BRONCO CHEVROLET",
+      "pred_text_corrected": ""
+    },
+    {
+      "video_id": "TdTJ26VgLbw",
+      "channel": "target_channel",
+      "brand_miss": [
+        "mercedes"
+      ],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "MERCEDES-BENZ W123 de 1980",
+      "pred_text_corrected": "CEDES W123 de 1980"
+    },
+    {
+      "video_id": "TpFmLrialMQ",
+      "channel": "target_channel",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "CASTOR Motorcraft",
+      "pred_text_corrected": "esrOr"
+    },
+    {
+      "video_id": "VBJxVk40d8o",
+      "channel": "target_channel",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "RANGO K02",
+      "pred_text_corrected": "AAMGO"
+    },
+    {
+      "video_id": "Z3u4xDsPZuc",
+      "channel": "target_channel",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "NISSAN (AWKWARD SILENCE)",
+      "pred_text_corrected": "NISSAN S AWKWARD SLENCE"
+    },
+    {
+      "video_id": "cYIQsJQDaEI",
+      "channel": "target_channel",
+      "brand_miss": [
+        "toyota"
+      ],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "GR",
+      "pred_text_corrected": "G"
+    },
+    {
+      "video_id": "dZVYDWY70_w",
+      "channel": "target_channel",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "XTREME",
+      "pred_text_corrected": "XTREM 三三"
+    },
+    {
+      "video_id": "ffxZhLgCqzU",
+      "channel": "target_channel",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "¿LO MEJOR DE COLOMBIA?",
+      "pred_text_corrected": "MEJOR DECOLOMBA ?"
+    },
+    {
+      "video_id": "jtmlk7Eq2_A",
+      "channel": "target_channel",
+      "brand_miss": [
+        "mercedes"
+      ],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "OPINIÓN TIENE CONMIGO 35 AÑOS.",
+      "pred_text_corrected": "OPINION TENE CONMIGO 35ANOS . TEN GO"
+    },
+    {
+      "video_id": "m1VmDMRTP_Y",
+      "channel": "target_channel",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "¡ESTO SALVA! TRAVEL RX KIT",
+      "pred_text_corrected": "ESTO SALVA TRAVELRXKT"
+    },
+    {
+      "video_id": "nQaqKjT-fGc",
+      "channel": "target_channel",
+      "brand_miss": [
+        "honda"
+      ],
+      "brand_fp": [],
+      "model_miss": [
+        "corvette"
+      ],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "JDM VS MUSCLE CORVETTE HONDA",
+      "pred_text_corrected": "RO AD VS MUSCLE"
+    },
+    {
+      "video_id": "nXTyb08IxbU",
+      "channel": "target_channel",
+      "brand_miss": [
+        "toyota"
+      ],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "con herramientas TOYOTA",
+      "pred_text_corrected": "Conherramientas"
+    },
+    {
+      "video_id": "pXZBc249Bm8",
+      "channel": "target_channel",
+      "brand_miss": [
+        "vw"
+      ],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "¡MEJORES CARROS ENTRY LEVEL 2026! CHICAGO",
+      "pred_text_corrected": "OMEJURESHARRIS EEAIRYLEVEL-2026"
+    },
+    {
+      "video_id": "qocjdF9FmBU",
+      "channel": "target_channel",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "tiene automática de 6 cambios es muy suave no es esa caja",
+      "pred_text_corrected": "38 38 tene automática de 6cambiosesmuy Suaveno es esa caa"
+    },
+    {
+      "video_id": "tRsGBPSyayQ",
+      "channel": "target_channel",
+      "brand_miss": [
+        "mercedes"
+      ],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "REPUTACIÓN",
+      "pred_text_corrected": "REPUTACIÓN"
+    },
+    {
+      "video_id": "vsNJDbfN_ME",
+      "channel": "target_channel",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "OVERLANDING OFF-ROADING OVERLANDING, PARA HACER",
+      "pred_text_corrected": "OMEBANDNG FOFFBOADNG OVERLANDING , PARA HACER"
+    },
+    {
+      "video_id": "vz5ObyV_SHg",
+      "channel": "target_channel",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "A",
+      "pred_text_corrected": "A"
+    },
+    {
+      "video_id": "xKUcQdPWIkM",
+      "channel": "target_channel",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [
+        "bz4x"
+      ],
+      "model_fp": [],
+      "year_miss": [
+        2026
+      ],
+      "year_fp": [],
+      "gt_text": "TOYOTA BZ 2026 ¡YA LLEGÓ A LATAM! ¡NUEVO! REVISIÓN Y TEST DRIVE COMPLETOS",
+      "pred_text_corrected": "BZ2046 TOYOTA YALLECOALATAM ! Ero nuevo ! REVISIONYTESTRVECOMPLES 8"
+    },
+    {
+      "video_id": "yaHcuhZE6Po",
+      "channel": "target_channel",
+      "brand_miss": [
+        "hyundai"
+      ],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "SANTA FE ES hybrid",
+      "pred_text_corrected": "SANTAFE"
+    },
+    {
+      "video_id": "z0UiiMoUoKQ",
+      "channel": "target_channel",
+      "brand_miss": [
+        "toyota"
+      ],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "AVENTURA vs PODER",
+      "pred_text_corrected": "PODER AVENTURA"
+    },
+    {
+      "video_id": "-Maf601rtkk",
+      "channel": "al_vazquez",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "",
+      "pred_text_corrected": ""
+    },
+    {
+      "video_id": "2IrpFoC1P3g",
+      "channel": "al_vazquez",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "PUSE A PRUEBA EL GENERADOR ELECTRICO ¡¡NO PAGO LUZ!! AFERIY P210",
+      "pred_text_corrected": "DUSE A PRUEBA ELGENERADOR ELECTRO FFERI AFERIYP210 TNO PAGOLUZ ! !"
+    },
+    {
+      "video_id": "2glXPtFxYmw",
+      "channel": "al_vazquez",
+      "brand_miss": [
+        "byd"
+      ],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "BYD SHARK 2025 China amenaza con su imperio",
+      "pred_text_corrected": "BYOSHARH 2025 CidAitos A Hhina meo aieiaza HIISI"
+    },
+    {
+      "video_id": "6FZVz0eeThE",
+      "channel": "al_vazquez",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [
+        "passport"
+      ],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "ADIÓS 4RUNNER Honda Passport 2026",
+      "pred_text_corrected": "DIOS 4 4RUNNER X Honda Passp0rt2026"
+    },
+    {
+      "video_id": "BiBb_eRJYjE",
+      "channel": "al_vazquez",
+      "brand_miss": [
+        "toyota"
+      ],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [
+        2026
+      ],
+      "year_fp": [],
+      "gt_text": "RAV4 2026 SOLO SERÁ HÍBRIDA",
+      "pred_text_corrected": "NRAV4J2N26 SULOSERA HÍBRIDA"
+    },
+    {
+      "video_id": "YR_g22s1pKU",
+      "channel": "al_vazquez",
+      "brand_miss": [
+        "ram"
+      ],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [
+        "destroyer"
+      ],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "RAM 1500 RHO 2025 Destruye TERRENOS",
+      "pred_text_corrected": "W 1500 2025 Destroyer TERRENO"
+    },
+    {
+      "video_id": "e87sH1gy-mQ",
+      "channel": "al_vazquez",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [
+        2025
+      ],
+      "year_fp": [],
+      "gt_text": "RUGIDO DE LA BESTIA 2025 JEEP RUBICON 392",
+      "pred_text_corrected": "rugidora BESTIA RUBICON Jeep 2251EPRUBCIN392"
+    },
+    {
+      "video_id": "geJlScDXvqs",
+      "channel": "al_vazquez",
+      "brand_miss": [
+        "nissan"
+      ],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "La Frontier 2025 La salvación de NISSAN?",
+      "pred_text_corrected": "frontier 2025 La savaconeNSAN"
+    },
+    {
+      "video_id": "gozuLW7YTIU",
+      "channel": "al_vazquez",
+      "brand_miss": [
+        "cadillac"
+      ],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "2025 ESCALADE V SACA LA BESTIA Y PROTEGELA",
+      "pred_text_corrected": "2025 ESCALADE Y"
+    },
+    {
+      "video_id": "v3CJtody-44",
+      "channel": "al_vazquez",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "PENSABA DE ÉL",
+      "pred_text_corrected": "PENSABADEeL"
+    },
+    {
+      "video_id": "-T1z9w6JV1c",
+      "channel": "auto_sensacion",
+      "brand_miss": [
+        "mercedes"
+      ],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "",
+      "pred_text_corrected": ""
+    },
+    {
+      "video_id": "0F9s88l74GI",
+      "channel": "auto_sensacion",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "Auto Sensación KIA VAN-TASTICA!! KIA PV5 Passager y Cargo PV5 Passenger",
+      "pred_text_corrected": "uta denaacion VAN-ASCAU W Pvs Pasear Cargo KIA PV5 Passadery"
+    },
+    {
+      "video_id": "1D7jBrqqTMY",
+      "channel": "auto_sensacion",
+      "brand_miss": [
+        "bmw"
+      ],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "Auto Sensación BMW X5 VS MERCEDES BENZ 450d X5 40d GLE",
+      "pred_text_corrected": "dutodendacion X G BS . GE6702 0 MTZ2830 BENZ450d BMWX540 VS MERCEDESBE"
+    },
+    {
+      "video_id": "8iGs10l4TIM",
+      "channel": "auto_sensacion",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "",
+      "pred_text_corrected": ""
+    },
+    {
+      "video_id": "DjOqHTS8ks0",
+      "channel": "auto_sensacion",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [
+        "t-cross",
+        "tcross"
+      ],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "Auto Sensación NUEVO COROLLA CROSS TOYOTA COROLLA CROSS 2026 GR SPORT",
+      "pred_text_corrected": "duto dendacion NUEVO COROLLACOSS COROLLA TCROSS G SOPORTE 2026 TOYOTACOROLLACROSS2"
+    },
+    {
+      "video_id": "RcI3VMaFNHY",
+      "channel": "auto_sensacion",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [
+        "land cruiser"
+      ],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "Auto Sensación EL BABY LAND CRUISER TOYOTA LAND CRUISER FJ",
+      "pred_text_corrected": "duto dendacion re TOYOTA ELBABY LAND CRUISER TOYOTA LANDCRUISER"
+    },
+    {
+      "video_id": "f4NPj3nmIeA",
+      "channel": "auto_sensacion",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "Auto Sensación NUEVO A4 AUDI A5 2025",
+      "pred_text_corrected": "Auto denaacion NUEVO X DTOOEROnL INK . FULLA SCREEN FULLLENGTH -LET'S GOI 0Q00 IN8A5006 INS5102 2025 A5 AUDI"
+    },
+    {
+      "video_id": "iwmO-rzX3t0",
+      "channel": "auto_sensacion",
+      "brand_miss": [
+        "bmw"
+      ],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "Auto Sensación GLC X3 VS MERCEDES BENZ GLC vs BMW X3",
+      "pred_text_corrected": "uta dendacion M X3 G . MXX3158 SLC4824 BMWX3 BENZGLCVSE MERCEDES"
+    },
+    {
+      "video_id": "jsfDS3WgnMo",
+      "channel": "auto_sensacion",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "",
+      "pred_text_corrected": ""
+    },
+    {
+      "video_id": "wV-2tEXcs7I",
+      "channel": "auto_sensacion",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "",
+      "pred_text_corrected": ""
+    },
+    {
+      "video_id": "0lcO63Ru17w",
+      "channel": "car_motor",
+      "brand_miss": [
+        "honda"
+      ],
+      "brand_fp": [],
+      "model_miss": [
+        "cr-v"
+      ],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "REVIEW Honda CR-V 2023 CAR MOTOR",
+      "pred_text_corrected": "REVIEW CAR HonoaCp-V2023 MOTOR"
+    },
+    {
+      "video_id": "7vC1PNt4p8M",
+      "channel": "car_motor",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [
+        "versa"
+      ],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "REVIEW Nissan Versa CAR MOTOR",
+      "pred_text_corrected": "REVIEW CAR Nissan versa MOTOR"
+    },
+    {
+      "video_id": "A_nmga9CXBE",
+      "channel": "car_motor",
+      "brand_miss": [
+        "suzuki"
+      ],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "Primer Contacto Suzuki Grand Vitara CAR MOTOR",
+      "pred_text_corrected": "Primer Contacto CAR Suzux Grand Vitar MOTOR"
+    },
+    {
+      "video_id": "Qw6RWt4QTGw",
+      "channel": "car_motor",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "REVIEW Chevrolet Montana CAR MOTOR",
+      "pred_text_corrected": "REVIEW CAR chevrolet Montana MOTOR"
+    },
+    {
+      "video_id": "ThwXeiLDG3Q",
+      "channel": "car_motor",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "Primer Contacto Changan X7 Plus CAR MOTOR",
+      "pred_text_corrected": "Primer Contacto X7PLUs CAR Changa X7 plus MOTOR"
+    },
+    {
+      "video_id": "WvQ1aeLdow4",
+      "channel": "car_motor",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "INDUSTRIA SECRETOS DE GEELY CAR MOTOR",
+      "pred_text_corrected": "INDUSTRIA CAROTO CAR SECRETOSDEGEELY MOTOR"
+    },
+    {
+      "video_id": "_HwkqC2LKPc",
+      "channel": "car_motor",
+      "brand_miss": [
+        "toyota"
+      ],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "Toyota RAV4 5 min REVIEW CAR MOTOR",
+      "pred_text_corrected": "TovotaRAV4 5 m MUIORG REVIEW CARMUIR"
+    },
+    {
+      "video_id": "bh2BEmAYJhY",
+      "channel": "car_motor",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "REVIEW Geely Okavango CAR MOTOR",
+      "pred_text_corrected": "REVIEW Geely Okavango CAR MOTOR"
+    },
+    {
+      "video_id": "mSXLA-r3FJA",
+      "channel": "car_motor",
+      "brand_miss": [
+        "toyota"
+      ],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [
+        "t-cross",
+        "tcross"
+      ],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "REVIEW Corolla Cross CAR MOTOR",
+      "pred_text_corrected": "REVIEW Corolla Tcross CAR MOTOR"
+    },
+    {
+      "video_id": "t8Ewe76HSoI",
+      "channel": "car_motor",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "REVIEW Jetour X90 Plus CAR MOTOR",
+      "pred_text_corrected": "REVIEW CAR Jetour xgo pus MOTOR"
+    },
+    {
+      "video_id": "17yiw4fDpzE",
+      "channel": "carglobe",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [
+        "grand cherokee"
+      ],
+      "year_miss": [
+        2017
+      ],
+      "year_fp": [],
+      "gt_text": "Jeep Grand Cherokee 2017",
+      "pred_text_corrected": "Jeep Grandcherokee"
+    },
+    {
+      "video_id": "BsTuPlxn-AI",
+      "channel": "carglobe",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "",
+      "pred_text_corrected": "o"
+    },
+    {
+      "video_id": "IV0S_hS806Q",
+      "channel": "carglobe",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "",
+      "pred_text_corrected": ""
+    },
+    {
+      "video_id": "SveYpm1AEFY",
+      "channel": "carglobe",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "LA PRUEBA EN 4... Volkswagen Tiguan",
+      "pred_text_corrected": "LA PRUEBA EN Volkswagen Tiguan"
+    },
+    {
+      "video_id": "h04V_T_fc1Y",
+      "channel": "carglobe",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "INCANSABLE",
+      "pred_text_corrected": "nansa"
+    },
+    {
+      "video_id": "oA6uE_Cmu6M",
+      "channel": "carglobe",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "",
+      "pred_text_corrected": ""
+    },
+    {
+      "video_id": "qf6XMF3jF9c",
+      "channel": "carglobe",
+      "brand_miss": [
+        "alfa romeo",
+        "fiat"
+      ],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "",
+      "pred_text_corrected": "A-1P-43 O-HL"
+    },
+    {
+      "video_id": "t2gZSM3sQ1s",
+      "channel": "carglobe",
+      "brand_miss": [
+        "mitsubishi"
+      ],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "",
+      "pred_text_corrected": "7-YV-61"
+    },
+    {
+      "video_id": "tAmKFpP5LPY",
+      "channel": "carglobe",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "",
+      "pred_text_corrected": ""
+    },
+    {
+      "video_id": "uiJERyIpIZM",
+      "channel": "carglobe",
+      "brand_miss": [
+        "chrysler",
+        "toyota"
+      ],
+      "brand_fp": [],
+      "model_miss": [
+        "sienna"
+      ],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "CAR-GLOBE Edición y cámaras Bernardo Mendoza/ Esaú Ponce SIENNA",
+      "pred_text_corrected": "ICABGLOBE 7-YV-06 825-YPN ICAR-GLOBE"
+    },
+    {
+      "video_id": "DJxHdszxZJM",
+      "channel": "diariomotor",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "GASOLINA",
+      "pred_text_corrected": "GASONA"
+    },
+    {
+      "video_id": "EDG1UOMmPSM",
+      "channel": "diariomotor",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "FÓRMULA UNO",
+      "pred_text_corrected": "FORMULAR FORNO UNO"
+    },
+    {
+      "video_id": "H_P_oooYBsY",
+      "channel": "diariomotor",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "6 VELOCIDADES",
+      "pred_text_corrected": "6VELOCIDADES"
+    },
+    {
+      "video_id": "J4cCu2Mx1U0",
+      "channel": "diariomotor",
+      "brand_miss": [
+        "jeep"
+      ],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "SI NO LO VES, NO LO CREERÁS DIARIOMOTOR",
+      "pred_text_corrected": "SLNOLOVES NOLOCREERAS 85271 12517M PROMOTOR :"
+    },
+    {
+      "video_id": "NApFnMWMqKE",
+      "channel": "diariomotor",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "QUE SE MOVIERA",
+      "pred_text_corrected": "AQUESE MOVERA"
+    },
+    {
+      "video_id": "Sc36edBOaTQ",
+      "channel": "diariomotor",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "FRENOS",
+      "pred_text_corrected": "FRENO"
+    },
+    {
+      "video_id": "SiRzB8K9Q54",
+      "channel": "diariomotor",
+      "brand_miss": [
+        "mazda"
+      ],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "bajas, con poca superficie",
+      "pred_text_corrected": "6584NDS banas con poca superficie"
+    },
+    {
+      "video_id": "c2aZwcpdK9w",
+      "channel": "diariomotor",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "DAKAR",
+      "pred_text_corrected": "DAKAR"
+    },
+    {
+      "video_id": "o1zF4RykTvo",
+      "channel": "diariomotor",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "LA BESTIA DIARIOMOTOR",
+      "pred_text_corrected": "LABESTA DARONOTOR"
+    },
+    {
+      "video_id": "oE_OZN-ik_M",
+      "channel": "diariomotor",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "212 QUÉ",
+      "pred_text_corrected": "QUE"
+    },
+    {
+      "video_id": "3fu0AmWGL-M",
+      "channel": "siempre_auto",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "Toyota GR Corolla",
+      "pred_text_corrected": "Toyota corolla"
+    },
+    {
+      "video_id": "3slKYxRjuGg",
+      "channel": "siempre_auto",
+      "brand_miss": [
+        "hyundai"
+      ],
+      "brand_fp": [],
+      "model_miss": [
+        "santa fe"
+      ],
+      "model_fp": [],
+      "year_miss": [
+        2024
+      ],
+      "year_fp": [],
+      "gt_text": "Siempre Auto HYUNDAI SANTA FE 2024 ¡CAMBIO RADICAL!",
+      "pred_text_corrected": "Siempre Auto HYUNIA SANA FF 24 FCAMBIU RADCAL"
+    },
+    {
+      "video_id": "4LneXiCRtZQ",
+      "channel": "siempre_auto",
+      "brand_miss": [
+        "ford"
+      ],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "Siempre Auto FORD F-150 2024 ¡SORPRENDENTE PUERTA TRASERA! PURPOSEFUL FEATURES ENHANCE PRODUCTIV",
+      "pred_text_corrected": "Siempre Auto F0RDF-150 2024 PUPOSEFL FEATURES NANCE PRODUCTIV FSURPRENUENE PUERIA IRASFRA !"
+    },
+    {
+      "video_id": "FbPyjRK8hdg",
+      "channel": "siempre_auto",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "SLATE AUTO ¡PRIMER VISTAZO!",
+      "pred_text_corrected": "SATEAITO ) VSAUY PRIMER"
+    },
+    {
+      "video_id": "JmRV1yS6vNA",
+      "channel": "siempre_auto",
+      "brand_miss": [
+        "toyota"
+      ],
+      "brand_fp": [],
+      "model_miss": [
+        "rav4"
+      ],
+      "model_fp": [],
+      "year_miss": [
+        2026
+      ],
+      "year_fp": [],
+      "gt_text": "TOYOTA RAV4 2026 ¡PRIMERA PRUEBA!",
+      "pred_text_corrected": "TOY0ARAAZ26 PRIMERA PRUEBA"
+    },
+    {
+      "video_id": "Sq1FCxCXkhM",
+      "channel": "siempre_auto",
+      "brand_miss": [
+        "vw"
+      ],
+      "brand_fp": [],
+      "model_miss": [
+        "tiguan"
+      ],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "VW TIGUAN 2025 Siempre Auto PRIMER VISTAZO",
+      "pred_text_corrected": "WW THUAN 2025 Siempreauto PRIMER VISTAZO"
+    },
+    {
+      "video_id": "XTt4C95vs40",
+      "channel": "siempre_auto",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "RAM 1500 TUNGSTEN 2025 Siempre Auto ¿LA MÁS LUJOSA?",
+      "pred_text_corrected": "SiempreAuto 2025 RAM 15I UNHS EN 21 LAMA LOSA ?"
+    },
+    {
+      "video_id": "by7mJiQT5TY",
+      "channel": "siempre_auto",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [
+        "corolla"
+      ],
+      "model_fp": [],
+      "year_miss": [
+        2023
+      ],
+      "year_fp": [],
+      "gt_text": "TOYOTA COROLLA 2023 ¿QUÉ TRAE NUEVO?",
+      "pred_text_corrected": "TOYOtApROLa283 2Q0ETRAEN0E07"
+    },
+    {
+      "video_id": "hdyEih2VUvI",
+      "channel": "siempre_auto",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "",
+      "pred_text_corrected": "SemDre Auto"
+    },
+    {
+      "video_id": "jcsG8uyTCNM",
+      "channel": "siempre_auto",
+      "brand_miss": [],
+      "brand_fp": [],
+      "model_miss": [],
+      "model_fp": [],
+      "year_miss": [],
+      "year_fp": [],
+      "gt_text": "#1 en USA",
+      "pred_text_corrected": "SA # enusA"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "pythonPath": "${HAILO_PIPELINES_HOME}",
+  "venvPath": "${HAILO_PIPELINES_HOME}",
+  "venv": "hailo",
+  "pythonVersion": "3.12",
+  "include": ["*.py", "tests/**/*.py"],
+  "extraPaths": ["DATA_ROOT (see README)"],
+  "executionEnvironments": [
+    {
+      "root": "tests",
+      "extraPaths": [
+        ".",
+        "DATA_ROOT (see README)",
+        "${HAILO_PIPELINES_HOME}"
+      ]
+    },
+    {
+      "root": ".",
+      "extraPaths": ["DATA_ROOT (see README)"]
+    }
+  ]
+}
