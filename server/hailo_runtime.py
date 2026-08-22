@@ -397,8 +397,15 @@ class HailoRuntime:
         all_scores: list[np.ndarray] = []
         all_kps: list[np.ndarray] = []
         for cls_name, bbox_name, kps_name, stride, fs in strides:
-            cls = np.asarray(out[cls_name]).reshape(fs, fs, 2)
-            bbox = np.asarray(out[bbox_name]).reshape(fs, fs, 2, 4)
+            cls_raw = np.asarray(out[cls_name])
+            bbox_raw = np.asarray(out[bbox_name])
+            if cls_raw.size != fs * fs * 2 or bbox_raw.size != fs * fs * 2 * 4:
+                raise HailoDeviceError(
+                    f"{HEF_FACE_DETECT} stride-{stride} heads have {cls_raw.size}/{bbox_raw.size} "
+                    f"values, expected {fs * fs * 2}/{fs * fs * 2 * 4}"
+                )
+            cls = cls_raw.reshape(fs, fs, 2)
+            bbox = bbox_raw.reshape(fs, fs, 2, 4)
             ys, xs, anchors = np.meshgrid(
                 np.arange(fs), np.arange(fs), np.arange(2), indexing="ij"
             )
@@ -522,7 +529,7 @@ class HailoRuntime:
           Boxes are always reported in *original* image coordinates regardless of mode.
         """
         if mode not in VALID_OCR_MODES:
-            raise ValueError(f"ocr mode must be one of {VALID_OCR_MODES}, got {mode!r}")
+            raise InvalidInput(f"ocr mode must be one of {VALID_OCR_MODES}, got {mode!r}")
         self.ensure_initialized()
         import cv2
         import hailo_platform as hpf
