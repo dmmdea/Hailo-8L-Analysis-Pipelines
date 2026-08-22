@@ -176,3 +176,15 @@ NPU is unreachable from the Linux side. Use the Windows HailoRT path above.
 ## License
 
 MIT
+
+## HTTP sidecar (for the offload-harness)
+
+`hailo-http.cmd` serves the same tools over loopback JSON-over-HTTP so a non-Python
+caller (the offload-harness's `internal/hailoclient`) can use the NPU:
+
+    GET  http://127.0.0.1:18813/health                 -> hailo_status()
+    POST http://127.0.0.1:18813/v1/face_embed  {"image_path": "..."}  -> the tool's dict
+
+The process exits on its own after `HAILO_SIDECAR_IDLE_SEC` (default 300 s) idle; the
+harness starts it on demand, so nothing runs when AI features are not in use.
+It refuses to bind anything but loopback — it is not an authenticated service.
