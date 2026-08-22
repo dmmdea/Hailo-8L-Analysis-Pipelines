@@ -78,7 +78,20 @@ COCO80 = (
     "hair drier", "toothbrush",
 )
 
+# Legacy charset location (the original Linux box). _charset_path() prefers the
+# live models dir so a box that sets HAILO_MODELS_DIR needs no extra config —
+# discovered on the first Windows deployment, where this absolute Linux path
+# made ocr fail with hefs_missing while every HEF was present.
 OCR_CHARSET_PATH = Path("/mnt/ai/hailo/models/charsets/ppocrv5_dict.txt")
+
+
+def _charset_path() -> Path:
+    """The PaddleOCR charset: <HAILO_MODELS_DIR>/charsets/ppocrv5_dict.txt when
+    present, else the legacy absolute path (kept so the original box keeps working)."""
+    p = _models_dir() / "charsets" / "ppocrv5_dict.txt"
+    if p.exists():
+        return p
+    return OCR_CHARSET_PATH
 
 # OCR modes — ordered slowest-to-fastest along the production axis. Every
 # caller that flows through HAILO_OCR_MODE or HailoRuntime.ocr(mode=...) must
@@ -656,9 +669,10 @@ class HailoRuntime:
 
     def _get_ocr_charset(self) -> list[str]:
         if self._ocr_charset is None:
-            if not OCR_CHARSET_PATH.exists():
-                raise HEFMissing(f"PaddleOCR charset missing at {OCR_CHARSET_PATH}")
-            with OCR_CHARSET_PATH.open("r", encoding="utf-8") as f:
+            charset_path = _charset_path()
+            if not charset_path.exists():
+                raise HEFMissing(f"PaddleOCR charset missing at {charset_path}")
+            with charset_path.open("r", encoding="utf-8") as f:
                 chars = [line.rstrip("\n").rstrip("\r") for line in f]
             chars.append(" ")  # PaddleOCR v5 uses use_space_char=True
             self._ocr_charset = chars
