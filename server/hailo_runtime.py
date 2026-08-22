@@ -1093,15 +1093,33 @@ class HailoRuntime:
         m, _ = cv2.estimateAffinePartial2D(src, dst, method=cv2.LMEDS)
         if m is None:
             raise InvalidInput("could not estimate the face alignment transform")
-        # estimateAffinePartial2D returns a finite-looking but singular matrix on
-        # coincident/collinear landmarks instead of None. That warps to a black
-        # 112×112 crop which ArcFace would embed into a plausible garbage vector.
-        # A similarity transform's uniform scale is sqrt(a²+b²) of its first column.
+        # estimateAffinePartial2D returns a FINITE similarity for degenerate
+        # landmarks instead of None — measured: five collinear points gave
+        # scale²=0.09, a 2 px cluster gave scale²=411 — and the warp then yields
+        # a smeared/black crop that ArcFace embeds into a plausible garbage
+        # vector. Neither finiteness nor a scale floor catches that. Two checks
+        # that do:
+        #  (1) source inter-ocular distance: below ~10 px there is no identity
+        #      signal to align (the template's is 35 px; that is a >3.5× upscale)
+        #  (2) reprojection residual: a similarity cannot map a line (or any
+        #      non-face-shaped set) onto the 2-D template, so |m·src - dst| stays
+        #      large exactly when the landmarks are not a face. Measured on
+        #      real SCrFD landmarks (3 people, frontal to 3/4 view): 1.8-4.4 px;
+        #      collinear/scrambled/cluster sets: 16.7-33 px. 12 px sits ~3× above
+        #      the worst real face and well below the nearest degenerate case.
         if not np.all(np.isfinite(m)):
             raise InvalidInput("face alignment transform is not finite (bad landmarks)")
-        scale2 = float(m[0, 0] ** 2 + m[1, 0] ** 2)
-        if scale2 < 1e-6:
-            raise InvalidInput("face alignment transform is degenerate (landmarks coincident/collinear)")
+        inter_ocular = float(np.linalg.norm(src[1] - src[0]))
+        if inter_ocular < 10.0:
+            raise InvalidInput(
+                f"landmarks too small to align (inter-ocular {inter_ocular:.1f} px, need ≥10)"
+            )
+        projected = src @ m[:, :2].T + m[:, 2]
+        residual = float(np.sqrt(np.mean(np.sum((projected - dst) ** 2, axis=1))))
+        if residual > 12.0:
+            raise InvalidInput(
+                f"landmarks do not fit a face (alignment residual {residual:.1f} px on the 112 canvas)"
+            )
         crop = cv2.warpAffine(img, m, (112, 112), borderValue=(0, 0, 0))
         rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
         tensor = np.expand_dims(rgb, axis=0).astype(np.uint8)
