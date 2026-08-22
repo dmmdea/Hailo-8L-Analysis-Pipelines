@@ -1,11 +1,16 @@
 """
-Hailo-vision MCP server — exposes the Hailo-8L accelerator as 4 MCP tools.
+Hailo-vision MCP server — exposes the Hailo-8L accelerator as 9 MCP tools.
 
 Tools:
-  - hailo_face_detect(image_path)   SCrFD-2.5G @ ~311 FPS on 8L
-  - hailo_ocr(image_path)           PaddleOCR v5 det + rec, ~4.59 FPS det bottleneck
-  - hailo_embed(image_path)         TinyCLIP image encoder, 512-d vector
-  - hailo_status()                  device + runtime state, safe with driver broken
+  - hailo_face_detect(image_path)        SCrFD-2.5G boxes + 5 landmarks, ~311 FPS on 8L
+  - hailo_face_embed(image_path)         ArcFace 512-d identity per face (landmark-aligned)
+  - hailo_ocr(image_path)                PaddleOCR v5 det + rec, ~4.59 FPS det bottleneck
+  - hailo_embed(image_path)              TinyCLIP ViT-61M image encoder, 512-d vector
+  - hailo_object_detect(image_path)      YOLOv8s, 80 COCO classes, on-chip NMS
+  - hailo_person_embed(image_path)       OSNet 512-d re-id per detected person
+  - hailo_depth(image_path)              Depth-Anything-V2 224-px relative depth map
+  - hailo_enhance_low_light(image_path)  Zero-DCE brightening at original resolution
+  - hailo_status()                       device + runtime state, safe with driver broken
 
 The server starts even when HAILO_VISION_ENABLED != '1' — tools return structured
 error dicts explaining the driver-fix-pending state. Flip the env var once the
@@ -28,6 +33,7 @@ from hailo_runtime import (  # noqa: E402 — import after dotenv so HAILO_VISIO
     HailoDeviceError,
     HailoRuntime,
     HailoRuntimeDisabled,
+    InvalidInput,
 )
 
 
@@ -52,9 +58,10 @@ def _guarded(fn):
         return _err(str(e), kind="not_implemented")
     except FileNotFoundError as e:
         return _err(f"image not found: {e}", kind="image_missing")
-    except ValueError as e:
-        # Input-contract failures (no landmarks, empty crop, bad alignment) —
-        # reported, never swallowed into a fake result.
+    except InvalidInput as e:
+        # ONLY the deliberate input-contract refusals (no landmarks, empty crop,
+        # degenerate alignment, unwritable output). A bare ValueError from numpy
+        # is an integration bug and must surface as one, not as "bad input".
         return _err(str(e), kind="invalid_input")
 
 
@@ -143,7 +150,9 @@ def hailo_depth(image_path: str, out_path: str | None = None) -> dict[str, Any]:
         lo, hi = float(d.min()), float(d.max())
         norm = (d - lo) / (hi - lo) if hi > lo else np.zeros_like(d)
         dest = Path(out_path) if out_path else p.with_suffix(".depth.png")
-        cv2.imwrite(str(dest), (norm * 255).astype(np.uint8))
+        # cv2.imwrite reports failure by returning False, never by raising.
+        if not cv2.imwrite(str(dest), (norm * 255).astype(np.uint8)):
+            raise InvalidInput(f"could not write {dest} — is the destination directory writable?")
         return {"depth_path": str(dest), "min": lo, "max": hi, "mean": float(d.mean())}
     return _guarded(_run)
 
@@ -182,7 +191,8 @@ def hailo_enhance_low_light(image_path: str, out_path: str | None = None) -> dic
         p = Path(image_path)
         img = _runtime.enhance_low_light(p)
         dest = Path(out_path) if out_path else p.with_suffix(".enhanced.png")
-        cv2.imwrite(str(dest), img)
+        if not cv2.imwrite(str(dest), img):
+            raise InvalidInput(f"could not write {dest} — is the destination directory writable?")
         return {"enhanced_path": str(dest), "width": int(img.shape[1]), "height": int(img.shape[0])}
     return _guarded(_run)
 

@@ -102,6 +102,13 @@ class HEFMissing(FileNotFoundError):
     """A required HEF file is not present in HAILO_MODELS_DIR."""
 
 
+class InvalidInput(ValueError):
+    """The CALLER's input cannot be processed (no landmarks, empty crop, unwritable
+    output path). Deliberately a distinct subclass: the MCP boundary catches only
+    this, so a bare ValueError from numpy (a wrong reshape = an integration bug)
+    is never relabelled as the caller's fault."""
+
+
 @dataclass(frozen=True)
 class FaceBox:
     x: int
@@ -411,7 +418,16 @@ class HailoRuntime:
             # 640-letterbox pixel position. The head is optional-by-name so a
             # HEF compiled without it still detects (kps stay empty).
             if kps_name in out:
-                kraw = np.asarray(out[kps_name]).reshape(fs, fs, 2, 5, 2)
+                raw = np.asarray(out[kps_name])
+                expected = fs * fs * 2 * 5 * 2
+                if raw.size != expected:
+                    # A wrong-shaped head is a HEF/runtime contract break, not a
+                    # bad image — surface it as a device error, never as input.
+                    raise HailoDeviceError(
+                        f"{HEF_FACE_DETECT} {kps_name} output has {raw.size} values, "
+                        f"expected {expected} (stride {stride})"
+                    )
+                kraw = raw.reshape(fs, fs, 2, 5, 2)
                 kx = anchor_x[..., None] + kraw[..., 0] * stride
                 ky = anchor_y[..., None] + kraw[..., 1] * stride
                 kps = np.stack([kx, ky], axis=-1).reshape(-1, 5, 2)
@@ -453,7 +469,12 @@ class HailoRuntime:
             if x2 <= x1 or y2 <= y1:
                 continue
             k = kps_all[i]
-            kps = () if np.isnan(k).any() else tuple(
+            # Landmarks are usable only if present (not the NaN sentinel) AND
+            # actually spread out. A low-confidence anchor can emit all-zero
+            # offsets, which decode to 5 coincident points at the anchor centre
+            # — "valid" numbers that would align to a black crop downstream.
+            spread = float((k.max(axis=0) - k.min(axis=0)).max()) if not np.isnan(k).any() else 0.0
+            kps = () if spread < 1.0 else tuple(
                 (float(px * inv), float(py * inv)) for px, py in k
             )
             results.append(
@@ -1034,7 +1055,14 @@ class HailoRuntime:
             format_type=hpf.FormatType.UINT8 if quantized_out else hpf.FormatType.FLOAT32,
         )
         with hpf.InferVStreams(ng, in_p, out_p) as pipe:
-            return pipe.infer({in_info.name: tensor})
+            out = pipe.infer({in_info.name: tensor})
+        # Every caller takes "the" output. If a swapped-in HEF has several heads,
+        # dict order would silently pick one of them — refuse instead.
+        if len(out) != 1:
+            raise HailoDeviceError(
+                f"{basename} has {len(out)} output vstreams; _infer_single expects exactly 1"
+            )
+        return out
 
     def face_embed(self, image_path: str | Path, face: FaceBox) -> list[float]:
         """ArcFace identity vector (512-d, L2-normalised) for ONE detected face.
@@ -1052,7 +1080,7 @@ class HailoRuntime:
         import numpy as np
 
         if len(face.kps) != 5:
-            raise ValueError(
+            raise InvalidInput(
                 "face_embed needs the 5 SCrFD landmarks (FaceBox.kps); this box has none"
             )
         img = cv2.imread(str(image_path))
@@ -1064,7 +1092,16 @@ class HailoRuntime:
         # estimateAffinePartial2D = similarity (4 DOF), the standard ArcFace warp.
         m, _ = cv2.estimateAffinePartial2D(src, dst, method=cv2.LMEDS)
         if m is None:
-            raise ValueError("could not estimate the face alignment transform")
+            raise InvalidInput("could not estimate the face alignment transform")
+        # estimateAffinePartial2D returns a finite-looking but singular matrix on
+        # coincident/collinear landmarks instead of None. That warps to a black
+        # 112×112 crop which ArcFace would embed into a plausible garbage vector.
+        # A similarity transform's uniform scale is sqrt(a²+b²) of its first column.
+        if not np.all(np.isfinite(m)):
+            raise InvalidInput("face alignment transform is not finite (bad landmarks)")
+        scale2 = float(m[0, 0] ** 2 + m[1, 0] ** 2)
+        if scale2 < 1e-6:
+            raise InvalidInput("face alignment transform is degenerate (landmarks coincident/collinear)")
         crop = cv2.warpAffine(img, m, (112, 112), borderValue=(0, 0, 0))
         rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
         tensor = np.expand_dims(rgb, axis=0).astype(np.uint8)
@@ -1073,7 +1110,7 @@ class HailoRuntime:
         vec = np.asarray(next(iter(out.values()))).flatten().astype(np.float64)
         norm = float(np.linalg.norm(vec))
         if norm == 0.0:
-            raise RuntimeError("ArcFace returned a zero vector")
+            raise HailoDeviceError("ArcFace returned a zero vector")
         return (vec / norm).tolist()
 
     def object_detect(self, image_path: str | Path, score_threshold: float = 0.3) -> list[ObjectBox]:
@@ -1098,18 +1135,36 @@ class HailoRuntime:
         out = self._infer_single(HEF_OBJECT_DETECT, tensor)
         result = next(iter(out.values()))
         # Batch of 1 → the per-class list is result[0].
-        per_class = result[0] if isinstance(result, list) and len(result) == 1 and isinstance(result[0], list) else result
-        if not isinstance(per_class, list):
-            raise RuntimeError(
-                f"unexpected NMS output type {type(per_class).__name__}; expected a per-class list"
+        per_class = result[0] if isinstance(result, (list, tuple)) and len(result) == 1 and isinstance(result[0], (list, tuple)) else result
+        # The contract is a FIXED 80-slot list where position == COCO class id.
+        # A sparse/shorter list would make enumerate() silently relabel every
+        # detection (a car reported as "person"); a non-list means a different
+        # HEF variant was dropped in. Both are device/HEF errors, not input.
+        if not isinstance(per_class, (list, tuple)):
+            raise HailoDeviceError(
+                f"{HEF_OBJECT_DETECT} NMS output is {type(per_class).__name__}, expected a per-class list"
+            )
+        if len(per_class) != len(COCO80):
+            raise HailoDeviceError(
+                f"{HEF_OBJECT_DETECT} NMS output has {len(per_class)} classes, expected {len(COCO80)} "
+                "— is this a non-NMS or non-COCO build?"
             )
 
         boxes: list[ObjectBox] = []
         for class_id, arr in enumerate(per_class):
-            arr = np.asarray(arr)
+            arr = np.asarray(arr, dtype=np.float64)
             if arr.size == 0:
                 continue
-            arr = arr.reshape(-1, 5)
+            # Validate the (n, 5) row shape explicitly — reshape(-1, 5) would
+            # silently reinterpret a (n, 4) array whenever n*4 divides by 5.
+            if arr.ndim == 1 and arr.size == 5:
+                arr = arr.reshape(1, 5)
+            elif not (arr.ndim == 2 and arr.shape[1] == 5):
+                raise HailoDeviceError(
+                    f"{HEF_OBJECT_DETECT} class {class_id} rows have shape {arr.shape}, expected (n, 5)"
+                )
+            if not np.all(np.isfinite(arr)):
+                raise HailoDeviceError(f"{HEF_OBJECT_DETECT} class {class_id} emitted non-finite values")
             for y1, x1, y2, x2, score in arr:
                 if float(score) < score_threshold:
                     continue
@@ -1143,7 +1198,10 @@ class HailoRuntime:
         rgb = cv2.cvtColor(cv2.resize(img, (224, 224)), cv2.COLOR_BGR2RGB)
         tensor = np.expand_dims(rgb, axis=0).astype(np.uint8)
         out = self._infer_single(HEF_DEPTH, tensor)
-        return np.asarray(next(iter(out.values()))).reshape(224, 224).astype(np.float32)
+        raw = np.asarray(next(iter(out.values())))
+        if raw.size != 224 * 224:
+            raise HailoDeviceError(f"{HEF_DEPTH} output has {raw.size} values, expected {224 * 224}")
+        return raw.reshape(224, 224).astype(np.float32)
 
     def person_embed(self, image_path: str | Path, box: ObjectBox | None = None) -> list[float]:
         """OSNet re-id vector (512-d, L2-normalised) for a person crop.
@@ -1162,14 +1220,20 @@ class HailoRuntime:
         if box is not None:
             img = img[box.y:box.y + box.h, box.x:box.x + box.w]
             if img.size == 0:
-                raise ValueError("person box is empty after cropping")
+                raise InvalidInput("person box is empty after cropping")
+            # A 1-2 px box survives the clamp, upsamples to a flat 128×256 image
+            # and embeds into a real-looking vector with no identity signal in it.
+            if min(img.shape[:2]) < 20:
+                raise InvalidInput(
+                    f"person crop too small for re-id ({img.shape[1]}×{img.shape[0]} px, need ≥20)"
+                )
         rgb = cv2.cvtColor(cv2.resize(img, (128, 256)), cv2.COLOR_BGR2RGB)  # (w, h)
         tensor = np.expand_dims(rgb, axis=0).astype(np.uint8)
         out = self._infer_single(HEF_PERSON_EMBED, tensor)
         vec = np.asarray(next(iter(out.values()))).flatten().astype(np.float64)
         norm = float(np.linalg.norm(vec))
         if norm == 0.0:
-            raise RuntimeError("OSNet returned a zero vector")
+            raise HailoDeviceError("OSNet returned a zero vector")
         return (vec / norm).tolist()
 
     def enhance_low_light(self, image_path: str | Path) -> Any:
@@ -1187,7 +1251,10 @@ class HailoRuntime:
         rgb = cv2.cvtColor(cv2.resize(img, (600, 400)), cv2.COLOR_BGR2RGB)  # (w, h)
         tensor = np.expand_dims(rgb, axis=0).astype(np.uint8)
         out = self._infer_single(HEF_LOW_LIGHT, tensor, quantized_out=True)
-        enhanced = np.asarray(next(iter(out.values()))).reshape(400, 600, 3).astype(np.uint8)
+        raw = np.asarray(next(iter(out.values())))
+        if raw.size != 400 * 600 * 3:
+            raise HailoDeviceError(f"{HEF_LOW_LIGHT} output has {raw.size} values, expected {400 * 600 * 3}")
+        enhanced = raw.reshape(400, 600, 3).astype(np.uint8)
         bgr = cv2.cvtColor(enhanced, cv2.COLOR_RGB2BGR)
         return cv2.resize(bgr, (orig_w, orig_h), interpolation=cv2.INTER_LINEAR)
 
