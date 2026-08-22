@@ -1,6 +1,6 @@
 # Hailo-8L Analysis Pipelines
 
-![License: MIT](https://img.shields.io/badge/License-MIT-green.svg) ![Hailo-8L](https://img.shields.io/badge/NPU-Hailo--8L_M.2-0091EA) ![MCP Server](https://img.shields.io/badge/MCP-server-8A2BE2) ![Python](https://img.shields.io/badge/Python-3.12-3776AB) ![Edge AI](https://img.shields.io/badge/inference-100%25_on--device-orange)
+![License: MIT](https://img.shields.io/badge/License-MIT-green.svg) ![Hailo-8L](https://img.shields.io/badge/NPU-Hailo--8L_M.2-0091EA) ![MCP Server](https://img.shields.io/badge/MCP-server-8A2BE2) ![Python](https://img.shields.io/badge/Python-3.10--3.13-3776AB) ![Edge AI](https://img.shields.io/badge/inference-100%25_on--device-orange)
 
 Production vision pipelines running entirely on a **Hailo-8L M.2 NPU module** (HM21LB1C2KAE): an MCP server that exposes the accelerator to any MCP-capable agent, a vendored feature library with Spanish-aware OCR correction, a measured multi-phase OCR quality program, and the Linux kernel driver patch that keeps the whole thing alive on modern kernels.
 
@@ -53,11 +53,125 @@ Without it, on recent kernels the VDMA buffer-map ioctl triggers a `find_vma` ke
 
 ## Requirements
 
-- Hailo-8L M.2 module with HailoRT and the (patched) PCIe driver
-- Python 3.12, `mcp` (FastMCP), `dotenv`; OCR pipelines additionally use PaddleOCR-compiled HEF models and `pyctcdecode`
-- Compiled `.hef` model binaries for SCrFD-2.5G, PaddleOCR v5, and TinyCLIP (not included; compile with the Hailo Dataflow Compiler for the 8L)
+- Hailo-8L M.2 module with HailoRT installed and the PCIe driver loaded (on Linux, the patched driver — see above)
+- Python 3.10–3.13 with `mcp<2`, `python-dotenv`, `opencv-python`, `numpy`, and the `hailort` Python bindings; `hailo_ocr` additionally needs `pyctcdecode`
+- The compiled `.hef` model binaries (not included in this repo — but free to download; see below)
 
 Analysis scripts read their data root from `HAILO_PIPELINES_DATA`.
+
+## Installation
+
+These steps were verified end-to-end on Windows 11 with a Hailo-8L (HM21LB1C2KAE) and
+HailoRT 4.24.0. Each subsection names a dead end that a reasonable reader walks into,
+because the obvious path is wrong in three places.
+
+### 1. The `.hef` models — download them, do not compile them
+
+You do **not** need the Hailo Dataflow Compiler. Every model this project uses is a
+precompiled, freely downloadable HEF in the public Hailo Model Zoo bucket — no account,
+no login:
+
+```
+https://hailo-model-zoo.s3.eu-west-2.amazonaws.com/ModelZoo/Compiled/v2.19.0/hailo8l/<name>.hef
+```
+
+Required (the filenames already match what `server/hailo_runtime.py` expects):
+
+```
+scrfd_2.5g.hef
+paddle_ocr_v5_mobile_detection.hef
+paddle_ocr_v5_mobile_recognition.hef
+tinyclip_vit_40m_32_text_19m_laion400m_image_encoder.hef
+```
+
+Optional (the runtime handles their absence): `real_esrgan_x2.hef`, `yolov5m_vehicles.hef`.
+All six total ~342 MB.
+
+Put them in one directory and point `HAILO_MODELS_DIR` at it.
+
+> **Use the `hailo8l` path segment, not `hailo8`.** The bucket carries both, and they are
+> different builds. A HAILO8 HEF is rejected by an 8L device at load time with an
+> architecture-mismatch error. Verify any HEF before trusting it:
+>
+> ```
+> hailortcli parse-hef <file>     # must print: Architecture HEF was compiled for: HAILO8L
+> ```
+>
+> A nonexistent object in this bucket returns HTTP **403**, not 404 — so when probing for
+> a model, test for a 200 rather than for the absence of a 404.
+
+### 2. The `hailort` Python bindings — they are inside the installer you already have
+
+`import hailo_platform` fails on a fresh HailoRT install, and `C:\Program Files\HailoRT`
+contains no Python package, which makes it look like the bindings must be fetched from the
+Hailo Developer Zone. They do not. On Windows the wheels ship **inside the HailoRT `.msi`**
+and are simply not deployed to `Program Files`. Extract the installer without running it:
+
+```
+msiexec /a hailort_4.24.0_windows_installer.msi /qn TARGETDIR=C:\hailort-extract
+```
+
+and the wheels are at `HailoRT\python\`, one per interpreter, named like
+`hailort-4.24.0-cp311-cp311-win_amd64.whl` (cp310, cp311, cp312, cp313 are present).
+Pick the one matching your interpreter. (This is also why the supported Python range is
+3.10–3.13: it is the set of wheels in the MSI.)
+
+> **Install it with `--no-deps`.** The wheel declares a dependency on `netifaces`, which has
+> no prebuilt wheel for current Pythons and tries to compile — failing with
+> *"Microsoft Visual C++ 14.0 or greater is required"*. `netifaces` only enumerates network
+> interfaces for **Ethernet-attached** Hailo devices; an M.2 (PCIe) module does not use it.
+>
+> ```
+> pip install argcomplete contextlib2 future netaddr
+> pip install --no-deps hailort-4.24.0-cp311-cp311-win_amd64.whl
+> ```
+
+The bindings are imported lazily inside `hailo_runtime.py`, so the MCP server starts and
+`hailo_status()` answers even before this step — it is the honest probe for whether the
+stack is complete.
+
+### 3. Python dependencies
+
+```
+pip install "mcp<2" python-dotenv opencv-python numpy
+pip install pyctcdecode        # only for hailo_ocr
+```
+
+> **Pin `mcp<2`.** `mcp` 2.0 removed `mcp.server.fastmcp`, which `server/server.py` imports;
+> on 2.x the server fails at import time. 1.29 is known-good.
+>
+> `pyctcdecode` downgrades `numpy` to 1.x. The pipelines work on both; just do not be
+> surprised by the version change.
+
+### 4. Enable and verify
+
+Windows (cmd):
+
+```
+set HAILO_MODELS_DIR=<your models directory>
+set HAILO_VISION_ENABLED=1
+python server/server.py
+```
+
+Linux / macOS:
+
+```
+export HAILO_MODELS_DIR=<your models directory>
+export HAILO_VISION_ENABLED=1
+python server/server.py
+```
+
+`hailo_status()` should report `enabled: true` and `hefs_missing: []`. Then run a real
+inference — `hailo_embed` on any image returns a 512-element vector. The first call pays
+the HEF load (several seconds); subsequent calls are fast.
+
+### Windows vs. Linux
+
+The kernel patch in `kernel-patch/` is for a **bare-metal Linux** host. On Windows, HailoRT's
+own driver is stable and the patch does not apply.
+
+Do not try to run this inside WSL2 on a Windows host: WSL2 has no PCIe passthrough, so the
+NPU is unreachable from the Linux side. Use the Windows HailoRT path above.
 
 ## License
 
