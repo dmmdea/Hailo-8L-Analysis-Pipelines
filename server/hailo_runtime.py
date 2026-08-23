@@ -142,6 +142,12 @@ class HEFMissing(FileNotFoundError):
     """A required HEF file is not present in HAILO_MODELS_DIR."""
 
 
+class DependencyMissing(RuntimeError):
+    """A required python package is not installed in the serving venv. Distinct
+    from HEFMissing on purpose: the remediation is `pip install`, not asset
+    provisioning, and the MCP boundary surfaces it under its own kind."""
+
+
 class InvalidInput(ValueError):
     """The CALLER's input cannot be processed (no landmarks, empty crop, unwritable
     output path). Deliberately a distinct subclass: the MCP boundary catches only
@@ -1354,10 +1360,12 @@ class HailoRuntime:
         with hpf.InferVStreams(ng, in_p, out_p) as pipe:
             return pipe.infer(feed)
 
-    def pose(self, image_path: str | Path, score_threshold: float = 0.3) -> list[dict[str, Any]]:
+    def pose(self, image_path: str | Path, score_threshold: float = 0.3) -> dict[str, Any]:
         """YOLOv8s-pose: people with 17 COCO keypoints each, host-decoded
         (decoders.py — the model zoo's own postprocessing math). Boxes and
-        keypoints are returned in the ORIGINAL image's pixel space."""
+        keypoints are returned in the ORIGINAL image's pixel space. The
+        scores_sigmoid_applied flag is passed THROUGH to the caller — a True
+        value means the HEF's score export changed and deserves investigation."""
         import cv2
         import numpy as np
 
@@ -1375,28 +1383,30 @@ class HailoRuntime:
         for box, score, kpts, jscores in zip(dec["boxes"], dec["scores"], dec["keypoints"], dec["joint_scores"]):
             x1, y1, x2, y2 = box
             people.append({
-                "x": int(x1 * sx), "y": int(y1 * sy),
-                "w": int((x2 - x1) * sx), "h": int((y2 - y1) * sy),
+                "x": int(round(x1 * sx)), "y": int(round(y1 * sy)),
+                "w": int(round((x2 - x1) * sx)), "h": int(round((y2 - y1) * sy)),
                 "score": float(score),
                 "keypoints": {
                     name: {"x": float(k[0] * sx), "y": float(k[1] * sy), "score": float(js)}
                     for name, k, js in zip(COCO_KEYPOINTS, kpts, jscores)
                 },
             })
-        return people
+        return {"people": people, "scores_sigmoid_applied": bool(dec["scores_sigmoid_applied"])}
 
     def segment(
         self,
         image_path: str | Path,
         everything: bool = False,
         score_threshold: float = 0.25,
-    ) -> tuple[list[dict[str, Any]], Any, tuple[int, int]]:
+    ) -> tuple[list[dict[str, Any]], Any, tuple[int, int], bool]:
         """Instance segmentation, host-decoded from raw heads (decoders.py).
 
         everything=False → yolov8s_seg (80 COCO classes); True → FastSAM-s
-        (class-agnostic segment-everything). Returns (instances, masks, (h, w)):
-        instances carry label/score/box in original pixel space; masks is a
-        bool array (n, orig_h, orig_w) aligned with instances."""
+        (class-agnostic segment-everything). Returns (instances, masks, (h, w),
+        scores_sigmoid_applied): instances carry label/score/box in original
+        pixel space; masks is a bool array (n, orig_h, orig_w) aligned with
+        instances; the flag passes through from the decoder (True = the HEF's
+        score export changed — investigate)."""
         import cv2
         import numpy as np
 
@@ -1419,14 +1429,14 @@ class HailoRuntime:
             label = "object" if everything else COCO80[int(cls)]
             instances.append({
                 "label": label, "class_id": int(cls),
-                "x": int(x1 * sx), "y": int(y1 * sy),
-                "w": int((x2 - x1) * sx), "h": int((y2 - y1) * sy),
+                "x": int(round(x1 * sx)), "y": int(round(y1 * sy)),
+                "w": int(round((x2 - x1) * sx)), "h": int(round((y2 - y1) * sy)),
                 "score": float(score),
             })
             masks_orig[i] = cv2.resize(
                 dec["masks"][i].astype(np.uint8), (orig_w, orig_h), interpolation=cv2.INTER_NEAREST
             ).astype(bool)
-        return instances, masks_orig, (orig_h, orig_w)
+        return instances, masks_orig, (orig_h, orig_w), bool(dec["scores_sigmoid_applied"])
 
     # --- text / zero-shot (CLIP-family text towers ON the NPU) --------------
 
@@ -1439,7 +1449,7 @@ class HailoRuntime:
         try:
             from tokenizers import Tokenizer
         except ImportError as e:
-            raise HEFMissing(
+            raise DependencyMissing(
                 "the `tokenizers` package is not installed in the sidecar venv — pip install tokenizers"
             ) from e
         base = _models_dir() / "assets"
@@ -1455,16 +1465,19 @@ class HailoRuntime:
         hef = {"tinyclip": HEF_TEXT_ENCODER, "siglip2": HEF_SIGLIP2_TEXT}[space]
         return tok, npz, hef
 
-    def text_embed(self, text: str, space: str = "tinyclip") -> list[float]:
-        """Text → embedding in the SAME space as this box's image embeddings.
+    def text_embed(self, text: str, space: str = "tinyclip") -> tuple[list[float], bool]:
+        """Text → (embedding, truncated) in the SAME space as this box's image
+        embeddings.
 
         The token-embedding lookup runs on host (a HEF cannot Gather); the
         transformer runs ON the NPU; the EOT gather + projection + L2 norm run
         on host — exactly the model zoo's text_encoder pipeline (positional
         embeddings are baked into the HEF graph; the zoo's tfrecord feeds
-        token embeddings WITHOUT a positional add, mirrored here).
+        token embeddings WITHOUT a positional add, mirrored here). Special
+        token ids are RESOLVED from the tokenizer file, never assumed.
         space: tinyclip (512-d, matches hailo_embed) | siglip2 (768-d, matches
-        the siglip2 image encoder only)."""
+        the siglip2 image encoder only). truncated=True means the text was
+        longer than the HEF's fixed sequence and only a prefix was embedded."""
         import numpy as np
 
         if space not in ("tinyclip", "siglip2"):
@@ -1478,20 +1491,38 @@ class HailoRuntime:
         seq_len = int(np.prod(in_shape[:-1]))
         width = int(in_shape[-1])
         enc = tok.encode(text)
-        ids = enc.ids[:seq_len]
+        truncated = len(enc.ids) > seq_len
+        ids = list(enc.ids[:seq_len])
         if space == "tinyclip":
-            # CLIP: <sot> ... <eot>, pad WITH the EOT token (the zoo pads with
-            # the EOT embedding); EOT position = argmax(ids) since EOT is the
-            # highest id in the vocab.
-            eot = int(table.shape[0] - 1)
+            # CLIP: <sot> ... <eot>, padded WITH the EOT token (the zoo pads
+            # with the EOT embedding). EOT id comes from the tokenizer; the
+            # asset pair is verified against it so a stale/padded table cannot
+            # silently gather the wrong row.
+            eot = tok.token_to_id("<|endoftext|>")
+            if eot is None:
+                raise HEFMissing(f"{space}_tokenizer.json has no <|endoftext|> token — wrong tokenizer file?")
+            if eot != table.shape[0] - 1:
+                raise HEFMissing(
+                    f"asset mismatch: tokenizer EOT id {eot} vs embedding table rows {table.shape[0]} — "
+                    "re-run scripts/extract_text_assets.py so the pair matches"
+                )
             if ids and ids[-1] != eot and len(ids) == seq_len:
                 ids[-1] = eot  # truncation must not lose the EOT token
             ids = ids + [eot] * (seq_len - len(ids))
-            last = int(np.argmax(np.asarray(ids)))
+            last = ids.index(eot)  # FIRST EOT = the pooled position (no argmax assumption)
         else:
-            pad = 0
+            pad = tok.token_to_id("<pad>")
+            if pad is None:
+                pad = tok.token_to_id("<|endoftext|>")
+            if pad is None:
+                raise HEFMissing(f"{space}_tokenizer.json has no <pad>/<|endoftext|> token — wrong tokenizer file?")
             ids = ids + [pad] * (seq_len - len(ids))
             last = -1  # unused: siglip2 output is already pooled
+        if ids and max(ids) >= table.shape[0]:
+            raise HEFMissing(
+                f"token id {max(ids)} exceeds the embedding table ({table.shape[0]} rows) — "
+                "tokenizer and table are mismatched; re-run scripts/extract_text_assets.py"
+            )
         embeds = table[np.asarray(ids)]  # (seq, width)
         if embeds.shape != (seq_len, width):
             raise HailoDeviceError(f"embedding table width {embeds.shape} does not match HEF input {in_shape}")
@@ -1508,7 +1539,7 @@ class HailoRuntime:
         n = float(np.linalg.norm(vec))
         if n > 0:
             vec = vec / n
-        return [float(v) for v in vec]
+        return [float(v) for v in vec], truncated
 
     def zero_shot(
         self,
@@ -1542,8 +1573,8 @@ class HailoRuntime:
             img_vec = img_vec / n
         sims = []
         for label in labels:
-            t = np.asarray(self.text_embed(template.format(label), space=space), dtype=np.float32)
-            sims.append(float(img_vec @ t))
+            vec, _ = self.text_embed(template.format(label), space=space)
+            sims.append(float(img_vec @ np.asarray(vec, dtype=np.float32)))
         s = np.asarray(sims)
         # softmax over a CLIP-typical temperature so probs are readable; the
         # SIMILARITIES are the ground truth, probs are presentation.

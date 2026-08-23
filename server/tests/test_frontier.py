@@ -159,6 +159,37 @@ class TestWhisperMel(unittest.TestCase):
         np.testing.assert_allclose(got, ref, atol=1e-4)
 
 
+class TestWhisperPureHelpers(unittest.TestCase):
+    def test_repetition_penalty_divides_recent_non_punct(self):
+        from whisper_npu import _apply_repetition_penalty
+        logits = np.ones((1, 100), dtype=np.float32) * 2.0
+        out = _apply_repetition_penalty(logits.copy(), generated=[7, 11, 13, 42], penalty=2.0)
+        self.assertAlmostEqual(float(out[7]), 1.0)   # penalized
+        self.assertAlmostEqual(float(out[42]), 1.0)  # penalized
+        self.assertAlmostEqual(float(out[11]), 2.0)  # punctuation exempt
+        self.assertAlmostEqual(float(out[13]), 2.0)  # punctuation exempt
+        self.assertAlmostEqual(float(out[50]), 2.0)  # untouched
+
+    def test_repetition_penalty_window(self):
+        from whisper_npu import _apply_repetition_penalty
+        logits = np.ones((1, 100), dtype=np.float32) * 2.0
+        generated = [5] + [20] * 8  # token 5 fell out of the 8-token window
+        out = _apply_repetition_penalty(logits.copy(), generated, penalty=2.0, window=8)
+        self.assertAlmostEqual(float(out[5]), 2.0)
+        self.assertAlmostEqual(float(out[20]), 1.0)
+
+    def test_clean_transcription_collapses_repeats(self):
+        from whisper_npu import clean_transcription
+        self.assertEqual(
+            clean_transcription("The fox jumps. The fox jumps. Something else."),
+            "The fox jumps.",
+        )
+        self.assertEqual(clean_transcription("One thing. Another thing."),
+                         "One thing. Another thing.")
+        self.assertEqual(clean_transcription("no terminal punctuation"),
+                         "no terminal punctuation.")
+
+
 class TestSidecarRegistry(unittest.TestCase):
     def test_new_tools_registered(self):
         import importlib.util

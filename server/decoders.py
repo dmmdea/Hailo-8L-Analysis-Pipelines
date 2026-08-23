@@ -10,8 +10,16 @@ measured. Two deliberate adaptations, both recorded here rather than silent:
   same class-shift trick — no compiled extension on the deployment box.
 - Score tensors are auto-ranged: the compiled HEFs emit post-sigmoid scores
   (the zoo thresholds them raw), but if a build ever emits logits (values
-  outside [0, 1]) we apply sigmoid once and note it in the result, instead of
-  silently thresholding logits — that failure mode reads as "no detections".
+  outside [0, 1]) we apply sigmoid ONCE over the concatenation of all three
+  scales — a single global decision, never per-scale (a coarse scale full of
+  background can sit inside [0,1] by chance while another scale is clearly
+  logits; mixing spaces silently is the failure this guards against) — and the
+  decision is returned in the result, instead of silently thresholding logits.
+- Seg NMS is SINGLE-label per box (argmax class), where the zoo evaluates
+  yolov8_seg with multi_label=True for mAP. Deliberate: an editor tool wants
+  one instance per object with its best class, not per-class duplicates of the
+  same box; FastSAM (1 class) is unaffected (the zoo collapses to single-label
+  there too). The trade is a small recall loss for ambiguous-class boxes.
 
 Everything here is pure numpy on host; the NPU only ran the backbone+heads.
 """
@@ -108,7 +116,17 @@ def _group_scales(outputs: dict[str, np.ndarray], image_dims: tuple[int, int]) -
             continue  # the 160×160 proto tensor (stride 4) is handled by the caller
         role_by_c = {64: "box", 51: "kpt", 32: "coeff"}
         role = role_by_c.get(t.shape[3], "score")
-        scales.setdefault(stride, {})[role] = t
+        slot = scales.setdefault(stride, {})
+        if role in slot:
+            # Two tensors mapping to one role = the channel-count heuristic is
+            # ambiguous for this HEF (e.g. a 64-class score head colliding with
+            # the 64-channel DFL tensor). Silently overwriting would feed
+            # wrong-semantics data into the decode — refuse loudly instead.
+            raise ValueError(
+                f"stride {stride}: both {slot[role].shape} and {t.shape} ({name}) map to role "
+                f"{role!r} — channel-count role assignment is ambiguous for this HEF"
+            )
+        slot[role] = t
     missing = [s for s in STRIDES if s not in scales]
     if missing:
         raise ValueError(f"missing yolov8 head scales for strides {missing}; got {[(n, o.shape) for n, o in outputs.items()]}")
@@ -135,16 +153,12 @@ def yolov8_pose_decode(
     """
     scales = _group_scales(outputs, image_dims)
     boxes_all, scores_all, kpts_all = [], [], []
-    applied = False
     for stride in STRIDES:
         sc = scales[stride]
         if "kpt" not in sc:
             raise ValueError(f"stride {stride} lacks the 51-channel keypoint tensor — is this a pose HEF?")
         boxes_all.append(_dfl_boxes(sc["box"].astype(np.float32), stride, image_dims))
-        s = np.reshape(sc["score"].astype(np.float32), (1, -1, sc["score"].shape[3]))
-        s, a = _scores_maybe_sigmoid(s)
-        applied = applied or a
-        scores_all.append(s)
+        scores_all.append(np.reshape(sc["score"].astype(np.float32), (1, -1, sc["score"].shape[3])))
         k = np.reshape(sc["kpt"].astype(np.float32), (1, -1, 17, 3))
         # zoo kpt decode: xy*2, then stride*(xy-0.5)+center
         shape = [int(x / stride) for x in image_dims]
@@ -155,7 +169,8 @@ def yolov8_pose_decode(
         kpts_all.append(k)
 
     boxes = np.concatenate(boxes_all, axis=1)[0]          # (N, 4) xywh
-    scores = np.concatenate(scores_all, axis=1)[0]        # (N, nc)
+    # ONE global decision over every scale's scores (see module docstring).
+    scores, applied = _scores_maybe_sigmoid(np.concatenate(scores_all, axis=1)[0])
     kpts = np.concatenate(kpts_all, axis=1)[0]            # (N, 17, 3)
 
     conf = scores.max(axis=1)
@@ -207,20 +222,17 @@ def yolov8_seg_decode(
     scales = _group_scales(heads, image_dims)
 
     boxes_all, scores_all, coeffs_all = [], [], []
-    applied = False
     for stride in STRIDES:
         sc = scales[stride]
         if "coeff" not in sc:
             raise ValueError(f"stride {stride} lacks the 32-channel mask-coefficient tensor — is this a seg HEF?")
         boxes_all.append(_dfl_boxes(sc["box"].astype(np.float32), stride, image_dims))
-        s = np.reshape(sc["score"].astype(np.float32), (1, -1, sc["score"].shape[3]))
-        s, a = _scores_maybe_sigmoid(s)
-        applied = applied or a
-        scores_all.append(s)
+        scores_all.append(np.reshape(sc["score"].astype(np.float32), (1, -1, sc["score"].shape[3])))
         coeffs_all.append(np.reshape(sc["coeff"].astype(np.float32), (1, -1, 32)))
 
     boxes = np.concatenate(boxes_all, axis=1)[0]
-    scores = np.concatenate(scores_all, axis=1)[0][:, :num_classes]
+    # ONE global decision over every scale's scores (see module docstring).
+    scores, applied = _scores_maybe_sigmoid(np.concatenate(scores_all, axis=1)[0][:, :num_classes])
     coeffs = np.concatenate(coeffs_all, axis=1)[0]
 
     conf = scores.max(axis=1)

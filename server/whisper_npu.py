@@ -58,7 +58,14 @@ def required_assets(models_dir: Path) -> list[str]:
 
 def _load_audio(path: Path) -> np.ndarray:
     """Mono float32 waveform at 16 kHz. ffmpeg when available (any container),
-    stdlib wave as the PCM16 fallback."""
+    stdlib wave ONLY when ffmpeg is absent (PCM16 WAV).
+
+    The two failure modes are kept apart on purpose: ffmpeg MISSING falls back
+    to wave, but ffmpeg FAILING means the file itself is bad and its stderr is
+    the correct diagnosis — retrying with a strictly weaker decoder would
+    convert "truncated mp4" into a misleading "not a RIFF file" error."""
+    from hailo_runtime import InvalidInput  # local import: avoid a cycle at module load
+
     try:
         out = subprocess.run(
             ["ffmpeg", "-nostdin", "-threads", "0", "-i", str(path),
@@ -66,19 +73,25 @@ def _load_audio(path: Path) -> np.ndarray:
             capture_output=True, check=True,
         ).stdout
         return np.frombuffer(out, np.int16).astype(np.float32) / 32768.0
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        pass
-    with wave.open(str(path), "rb") as w:
-        if w.getsampwidth() != 2:
-            raise ValueError(f"{path}: only PCM16 WAV is supported without ffmpeg")
-        data = np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float32) / 32768.0
-        if w.getnchannels() > 1:
-            data = data.reshape(-1, w.getnchannels()).mean(axis=1)
-        if w.getframerate() != SAMPLE_RATE:
-            # linear resample — good enough for speech at these rates
-            n = int(round(len(data) * SAMPLE_RATE / w.getframerate()))
-            data = np.interp(np.linspace(0, len(data) - 1, n), np.arange(len(data)), data).astype(np.float32)
-        return data
+    except FileNotFoundError:
+        pass  # no ffmpeg on this box — the wave fallback below is legitimate
+    except subprocess.CalledProcessError as e:
+        tail = (e.stderr or b"").decode(errors="replace")[-500:]
+        raise InvalidInput(f"ffmpeg could not decode {path}: {tail}") from e
+    try:
+        with wave.open(str(path), "rb") as w:
+            if w.getsampwidth() != 2:
+                raise InvalidInput(f"{path}: only PCM16 WAV is supported without ffmpeg")
+            data = np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float32) / 32768.0
+            if w.getnchannels() > 1:
+                data = data.reshape(-1, w.getnchannels()).mean(axis=1)
+            if w.getframerate() != SAMPLE_RATE:
+                # linear resample — good enough for speech at these rates
+                n = int(round(len(data) * SAMPLE_RATE / w.getframerate()))
+                data = np.interp(np.linspace(0, len(data) - 1, n), np.arange(len(data)), data).astype(np.float32)
+            return data
+    except (wave.Error, EOFError) as e:
+        raise InvalidInput(f"{path}: not a valid PCM WAV file ({e}); install ffmpeg for other formats") from e
 
 
 def _log_mel(audio: np.ndarray, filters: np.ndarray) -> np.ndarray:
@@ -139,6 +152,8 @@ def transcribe_file(runtime: Any, audio_path: Path, language: str = "en") -> dic
     from hailo_runtime import (  # local import: avoid a cycle at module load
         HEF_WHISPER_DECODER,
         HEF_WHISPER_ENCODER,
+        DependencyMissing,
+        HailoDeviceError,
         HEFMissing,
         InvalidInput,
         _models_dir,
@@ -147,7 +162,7 @@ def transcribe_file(runtime: Any, audio_path: Path, language: str = "en") -> dic
     try:
         from tokenizers import Tokenizer
     except ImportError as e:
-        raise HEFMissing("the `tokenizers` package is not installed in the sidecar venv — pip install tokenizers") from e
+        raise DependencyMissing("the `tokenizers` package is not installed in the sidecar venv — pip install tokenizers") from e
 
     if not audio_path.exists():
         raise FileNotFoundError(f"audio not found: {audio_path}")
@@ -179,7 +194,13 @@ def transcribe_file(runtime: Any, audio_path: Path, language: str = "en") -> dic
     dec_name = dec_hef.get_network_group_names()[0]
     dec_out_names = [n for n in dec_hef.get_sorted_output_names() if "conv" in n]
     if not dec_out_names:
-        dec_out_names = list(dec_hef.get_sorted_output_names())
+        # Guessing here would concatenate arbitrary tensors and argmax fluent
+        # nonsense out of them — a wrong answer presented as success. Refuse.
+        raise HailoDeviceError(
+            "whisper decoder HEF has no 'conv'-named logit outputs — got "
+            f"{list(dec_hef.get_sorted_output_names())}; this port matches the hailo-apps "
+            "fixed-sequence-matmul-split decoder graph only"
+        )
     seq_len = int(dec_hef.get_output_vstream_infos()[0].shape[1])
     dec_in_names = [i.name for i in dec_hef.get_input_vstream_infos()]
     enc_feed_name = next((n for n in dec_in_names if n.endswith("input_layer1")), dec_in_names[0])
@@ -217,6 +238,11 @@ def transcribe_file(runtime: Any, audio_path: Path, language: str = "en") -> dic
             )
             parts = [np.asarray(out[n], dtype=np.float32).reshape((1, seq_len, -1)) for n in dec_out_names]
             logits_all = np.concatenate(parts, axis=2)
+            if logits_all.shape[-1] != tok.get_vocab_size(with_added_tokens=True):
+                raise HailoDeviceError(
+                    f"decoder logit width {logits_all.shape[-1]} != tokenizer vocab "
+                    f"{tok.get_vocab_size(with_added_tokens=True)} — output concat is wrong for this HEF"
+                )
             logits = _apply_repetition_penalty(logits_all[:, i], generated)
             next_token = int(np.argmax(logits))
             generated.append(next_token)
