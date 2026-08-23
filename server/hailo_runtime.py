@@ -322,6 +322,7 @@ class HailoRuntime:
         self._initialized = False
         self._vdevice: Any = None
         self._networks: dict[str, Any] = {}
+        self._mru: list[str] = []  # most-recently-configured first (FW-memory resets)
         self._ocr_charset: list[str] | None = None
         self._beam_decoder: Any = None
         self._hotwords: list[str] | None = None
@@ -354,28 +355,74 @@ class HailoRuntime:
         self._vdevice = hpf.VDevice(params=params)
 
     def _configure_networks(self) -> None:
+        """Configure the CORE network groups only. Optional HEFs configure
+        LAZILY on first use (_require → _configure_one): the Hailo-8L's
+        firmware memory cannot hold ~20 configured groups at once — the
+        eager-configure-everything approach died with HAILO_OUT_OF_FW_MEMORY
+        the moment the frontier HEFs (siglip2 pair, whisper pair, pose/seg)
+        landed on disk (measured on the OptiPlex, 2026-08-23)."""
+        for basename in ALL_HEFS:
+            self._configure_one(basename)
+
+    def _configure_one(self, basename: str) -> None:
+        """Configure one HEF into the shared VDevice. On OUT_OF_FW_MEMORY,
+        reset the device and rebuild a smaller working set: core HEFs, then
+        this one, then the most-recently-used others best-effort. The sidecar
+        serializes tool calls, so a reset can never race an inference."""
         import hailo_platform as hpf
 
-        d = _models_dir()
-        for basename in ALL_HEFS:
-            hef = hpf.HEF(str(d / basename))
-            cfg = hpf.ConfigureParams.create_from_hef(
-                hef=hef, interface=hpf.HailoStreamInterface.PCIe
-            )
-            ng = self._vdevice.configure(hef, cfg)[0]
-            self._networks[basename] = (hef, ng)
-        # Optional HEFs: configure only if the file is on disk. Lets the runtime
-        # boot on systems that haven't downloaded the quality-mode extras.
-        for basename in OPTIONAL_HEFS:
-            path = d / basename
-            if not path.exists():
-                continue
-            hef = hpf.HEF(str(path))
-            cfg = hpf.ConfigureParams.create_from_hef(
-                hef=hef, interface=hpf.HailoStreamInterface.PCIe
-            )
-            ng = self._vdevice.configure(hef, cfg)[0]
-            self._networks[basename] = (hef, ng)
+        path = _models_dir() / basename
+        if not path.exists():
+            raise HEFMissing(f"{basename} not present in {_models_dir()}")
+        try:
+            self._try_configure(basename)
+            return
+        except hpf.pyhailort.pyhailort.HailoRTException as e:
+            if "OUT_OF_FW_MEMORY" not in str(e):
+                raise HailoDeviceError(f"configuring {basename}: {e}") from e
+        # FW memory exhausted: rebuild the working set around this request.
+        mru = [b for b in self._mru if b != basename and b not in ALL_HEFS]
+        self._release_device()
+        self._open_vdevice()
+        self._networks.clear()
+        for core in ALL_HEFS:
+            self._try_configure(core)
+        try:
+            self._try_configure(basename)
+        except hpf.pyhailort.pyhailort.HailoRTException as e:
+            raise HailoDeviceError(
+                f"{basename} does not fit the device firmware memory even alone beside the core set: {e}"
+            ) from e
+        # Re-add recent groups while they still fit; the first miss stops —
+        # they will lazily re-configure (with another reset) when next used.
+        for recent in mru:
+            try:
+                self._try_configure(recent)
+            except hpf.pyhailort.pyhailort.HailoRTException:
+                break
+
+    def _try_configure(self, basename: str) -> None:
+        import hailo_platform as hpf
+
+        if basename in self._networks:
+            return
+        hef = hpf.HEF(str(_models_dir() / basename))
+        cfg = hpf.ConfigureParams.create_from_hef(
+            hef=hef, interface=hpf.HailoStreamInterface.PCIe
+        )
+        ng = self._vdevice.configure(hef, cfg)[0]
+        self._networks[basename] = (hef, ng)
+        if basename in self._mru:
+            self._mru.remove(basename)
+        self._mru.insert(0, basename)
+
+    def _release_device(self) -> None:
+        if self._vdevice is not None:
+            try:
+                self._vdevice.release()
+            except Exception:
+                pass
+        self._vdevice = None
 
     def close(self) -> None:
         if self._vdevice is not None:
@@ -1080,13 +1127,17 @@ class HailoRuntime:
     # --- editor-workstation tools -----------------------------------------
 
     def _require(self, basename: str) -> tuple[Any, Any]:
-        """The (hef, network_group) for an optional HEF, or HEFMissing naming it."""
+        """The (hef, network_group) for a HEF, configuring it LAZILY on first
+        use (FW memory is bounded — see _configure_one). HEFMissing when the
+        file is not on disk; HailoDeviceError when the device refuses it."""
         self.ensure_initialized()
         if basename not in self._networks:
-            raise HEFMissing(
-                f"{basename} not loaded — drop it in {_models_dir()} "
-                "and re-instantiate HailoRuntime"
-            )
+            self._configure_one(basename)
+        else:
+            # keep the MRU order honest so FW-memory resets keep hot groups
+            if basename in self._mru:
+                self._mru.remove(basename)
+                self._mru.insert(0, basename)
         return self._networks[basename]
 
     def _infer_single(self, basename: str, tensor: Any, quantized_out: bool = False) -> dict[str, Any]:
