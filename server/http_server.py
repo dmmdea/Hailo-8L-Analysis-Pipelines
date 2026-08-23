@@ -50,6 +50,11 @@ TOOLS = {
     "enhance_low_light": server.hailo_enhance_low_light,
     "ocr": server.hailo_ocr,
     "embed": server.hailo_embed,
+    "pose": server.hailo_pose,
+    "segment": server.hailo_segment,
+    "text_embed": server.hailo_text_embed,
+    "zero_shot": server.hailo_zero_shot,
+    "transcribe": server.hailo_transcribe,
 }
 
 _last_request = time.monotonic()
