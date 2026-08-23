@@ -107,6 +107,13 @@ class Handler(BaseHTTPRequestHandler):
                 result = tool(**args)
         except TypeError as e:  # wrong/missing keyword → the caller's problem, said plainly
             return self._send(400, {"error": True, "kind": "bad_request", "message": str(e)})
+        except Exception as e:  # noqa: BLE001 — last-resort guard: a raw native
+            # exception (HailoRT, numpy) escaping the tool layer used to kill
+            # the request THREAD, and the Go client saw a dropped connection
+            # with no diagnosis (measured: OUT_OF_FW_MEMORY at configure).
+            # A structured 500 keeps the sidecar answering and the cause visible.
+            return self._send(500, {"error": True, "kind": "internal",
+                                    "message": f"{type(e).__name__}: {e}"})
         return self._send(200, result)
 
 
