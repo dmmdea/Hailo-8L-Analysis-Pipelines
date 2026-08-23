@@ -80,12 +80,12 @@ def _fetch(url: str, dest: Path) -> Path:
 
 def _savez_atomic(dest: Path, **arrays) -> None:
     """np.savez via a .part temp + os.replace, so an interrupted write can never
-    leave a 'done-looking' corrupt npz behind the exists check."""
-    tmp = dest.with_suffix(dest.suffix + ".part")
-    np.savez(tmp, **arrays)
-    # np.savez appends .npz to names without it — normalize
-    written = tmp if tmp.exists() else tmp.with_suffix(tmp.suffix + ".npz")
-    os.replace(written, dest)
+    leave a 'done-looking' corrupt npz behind the exists check. savez gets an
+    OPEN FILE handle, sidestepping its append-.npz-to-the-name behavior."""
+    tmp = Path(str(dest) + ".part")
+    with open(tmp, "wb") as f:
+        np.savez(f, **arrays)
+    os.replace(tmp, dest)
 
 
 def _safetensors_tensor(path: Path, name: str) -> np.ndarray:

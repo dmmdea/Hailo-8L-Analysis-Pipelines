@@ -238,11 +238,15 @@ def transcribe_file(runtime: Any, audio_path: Path, language: str = "en") -> dic
             )
             parts = [np.asarray(out[n], dtype=np.float32).reshape((1, seq_len, -1)) for n in dec_out_names]
             logits_all = np.concatenate(parts, axis=2)
-            if logits_all.shape[-1] != tok.get_vocab_size(with_added_tokens=True):
+            vocab = tok.get_vocab_size(with_added_tokens=True)
+            if logits_all.shape[-1] < vocab:
                 raise HailoDeviceError(
-                    f"decoder logit width {logits_all.shape[-1]} != tokenizer vocab "
-                    f"{tok.get_vocab_size(with_added_tokens=True)} — output concat is wrong for this HEF"
+                    f"decoder logit width {logits_all.shape[-1]} < tokenizer vocab {vocab} "
+                    "— output concat is wrong for this HEF"
                 )
+            # A compiler may PAD the logit width past the vocab; argmax must
+            # never pick a padding column, so slice to the real vocab.
+            logits_all = logits_all[..., :vocab]
             logits = _apply_repetition_penalty(logits_all[:, i], generated)
             next_token = int(np.argmax(logits))
             generated.append(next_token)
