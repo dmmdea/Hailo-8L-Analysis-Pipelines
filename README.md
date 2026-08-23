@@ -8,14 +8,36 @@ Everything here ran as a working, productive pipeline for thumbnail and image an
 
 ## MCP server
 
-`server/server.py` exposes 4 tools over MCP:
+`server/server.py` exposes 14 tools over MCP (the same set the HTTP sidecar serves):
 
-| Tool | Model | Measured on the 8L |
+| Tool | Model | Notes |
 |---|---|---|
-| `hailo_face_detect(image_path)` | SCrFD-2.5G | ~311 FPS |
+| `hailo_face_detect(image_path)` | SCrFD-2.5G | ~311 FPS, 5 landmarks per face |
+| `hailo_face_embed(image_path)` | SCrFD → ArcFace (landmark-aligned) | 512-d identity vector per face |
 | `hailo_ocr(image_path)` | PaddleOCR v5 (det + rec) | ~4.59 FPS (detection-bound) |
-| `hailo_embed(image_path)` | TinyCLIP image encoder | 512-d vector |
+| `hailo_embed(image_path)` | TinyCLIP ViT-61M image encoder | 512-d vector |
+| `hailo_object_detect(image_path)` | YOLOv8s (on-chip NMS) | 80 COCO classes |
+| `hailo_person_embed(image_path)` | YOLOv8s → OSNet | 512-d re-id, works with no visible face |
+| `hailo_depth(image_path)` | Depth-Anything-V2 ViT-S | 224 px relative depth PNG |
+| `hailo_enhance_low_light(image_path)` | Zero-DCE | original-resolution brightening |
+| `hailo_pose(image_path)` | YOLOv8s-pose (raw head, host decode) | 17 COCO keypoints per person |
+| `hailo_segment(image_path, everything=)` | YOLOv8s-seg / FastSAM-s (raw head) | instance-id mask PNG; `everything=True` = class-agnostic |
+| `hailo_text_embed(text, space=)` | TinyCLIP text tower ON the NPU (or siglip2) | text vectors in the image-embedding space |
+| `hailo_zero_shot(image_path, labels)` | TinyCLIP or SigLIP2 pair, both towers on-NPU | free-text labels → ranked similarities |
+| `hailo_transcribe(audio_path)` | Whisper-base encoder+decoder HEFs | 5 s chunks, greedy decode, 60 s cap — fast tier |
 | `hailo_status()` | n/a | device + runtime state, safe to call with the driver down |
+
+Raw-head decoding (pose/seg/FastSAM) is the model zoo's own postprocessing math ported to
+plain numpy (`server/decoders.py`); the text towers run their transformer ON the NPU with
+host-side tokenization + EOT-gather/projection (`tokenizers` package). The Whisper pair is
+hailo-apps' h8l build with its decode loop ported torch-free (`server/whisper_npu.py` —
+the mel path is unit-tested for numerical parity against the torch reference).
+
+**Extra host-side assets** (text/zero-shot/transcribe only): run
+`python scripts/extract_text_assets.py` once — it provisions token-embedding tables (parsed
+from HF safetensors with numpy, no torch), tokenizer files, whisper decoder npys and the mel
+filterbank into `<HAILO_MODELS_DIR>/assets/`, and needs `pip install tokenizers` in the
+serving venv. `--siglip2` adds the (large) SigLIP2 text table.
 
 The server starts even when `HAILO_VISION_ENABLED != '1'`: tools return structured error dicts describing the disabled state, and flipping the env var makes them live without restarting the MCP host. Secrets load from `~/.hailo-vision/secrets.env` when present.
 

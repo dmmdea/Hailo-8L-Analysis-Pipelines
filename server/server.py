@@ -1,5 +1,5 @@
 """
-Hailo-vision MCP server — exposes the Hailo-8L accelerator as 9 MCP tools.
+Hailo-vision MCP server — exposes the Hailo-8L accelerator as 14 MCP tools.
 
 Tools:
   - hailo_face_detect(image_path)        SCrFD-2.5G boxes + 5 landmarks, ~311 FPS on 8L
@@ -10,6 +10,11 @@ Tools:
   - hailo_person_embed(image_path)       OSNet 512-d re-id per detected person
   - hailo_depth(image_path)              Depth-Anything-V2 224-px relative depth map
   - hailo_enhance_low_light(image_path)  Zero-DCE brightening at original resolution
+  - hailo_pose(image_path)               YOLOv8s-pose, 17 COCO keypoints per person
+  - hailo_segment(image_path)            YOLOv8s-seg / FastSAM-s instance masks (id-map PNG)
+  - hailo_text_embed(text)               TinyCLIP/SigLIP2 text tower ON the NPU
+  - hailo_zero_shot(image_path, labels)  free-text labels -> ranked similarities, both towers on-NPU
+  - hailo_transcribe(audio_path)         Whisper-base encoder+decoder HEFs, 5 s chunks
   - hailo_status()                       device + runtime state, safe with driver broken
 
 The server starts even when HAILO_VISION_ENABLED != '1' — tools return structured
@@ -29,6 +34,7 @@ if SECRETS_ENV.exists():
     load_dotenv(SECRETS_ENV)
 
 from hailo_runtime import (  # noqa: E402 — import after dotenv so HAILO_VISION_ENABLED is set
+    DependencyMissing,
     HEFMissing,
     HailoDeviceError,
     HailoRuntime,
@@ -52,6 +58,8 @@ def _guarded(fn):
         return _err(str(e), kind="hailo_disabled")
     except HEFMissing as e:
         return _err(str(e), kind="hefs_missing")
+    except DependencyMissing as e:
+        return _err(str(e), kind="dependency_missing")
     except HailoDeviceError as e:
         return _err(str(e), kind="hailo_device_error")
     except NotImplementedError as e:
@@ -219,6 +227,112 @@ def hailo_embed(image_path: str) -> dict[str, Any]:
     def _run():
         v = _runtime.embed(Path(image_path))
         return {"embedding": v, "dim": len(v)}
+    return _guarded(_run)
+
+
+@mcp.tool()
+def hailo_pose(image_path: str, score_threshold: float = 0.3) -> dict[str, Any]:
+    """Human pose estimation via YOLOv8s-pose on Hailo-8L (host-decoded raw head).
+
+    Returns {"people": [{x,y,w,h,score,keypoints:{nose:{x,y,score},...}}], "count": N}
+    — 17 COCO keypoints per person, in the image's own pixel space.
+    """
+    def _run():
+        r = _runtime.pose(Path(image_path), score_threshold=score_threshold)
+        out = {"people": r["people"], "count": len(r["people"])}
+        if r["scores_sigmoid_applied"]:
+            # The HEF's score export changed (logits, not probabilities) — the
+            # decode self-corrected, but the operator should know.
+            out["scores_sigmoid_applied"] = True
+        return out
+    return _guarded(_run)
+
+
+@mcp.tool()
+def hailo_segment(
+    image_path: str,
+    everything: bool = False,
+    score_threshold: float = 0.25,
+    out_path: str | None = None,
+) -> dict[str, Any]:
+    """Instance segmentation on Hailo-8L. everything=False → YOLOv8s-seg (80 COCO
+    classes); everything=True → FastSAM-s (class-agnostic segment-everything).
+
+    Writes an instance-id mask PNG (uint8: 0 = background, i = instances[i-1])
+    to out_path or <name>.mask.png. Returns {"instances": [{label, class_id,
+    x, y, w, h, score}], "mask_path", "count"}.
+    """
+    def _run():
+        import cv2
+        import numpy as np
+        p = Path(image_path)
+        instances, masks, (h, w), sig_applied = _runtime.segment(
+            p, everything=everything, score_threshold=score_threshold
+        )
+        # uint8 id map: ids are 1..n. decoders caps max_det at 50 today, but
+        # nothing ties that constant to this dtype — assert instead of wrapping.
+        if len(instances) > 255:
+            raise HailoDeviceError(f"{len(instances)} instances exceed the uint8 id map")
+        idmap = np.zeros((h, w), dtype=np.uint8)
+        # paint lowest-score first so the strongest instance wins overlaps
+        for i in sorted(range(len(instances)), key=lambda k: instances[k]["score"]):
+            idmap[masks[i]] = i + 1
+        dest = Path(out_path) if out_path else p.with_suffix(".mask.png")
+        if not cv2.imwrite(str(dest), idmap):
+            raise InvalidInput(f"could not write {dest} — is the destination directory writable?")
+        out = {"instances": instances, "mask_path": str(dest), "count": len(instances)}
+        if sig_applied:
+            out["scores_sigmoid_applied"] = True
+        return out
+    return _guarded(_run)
+
+
+@mcp.tool()
+def hailo_text_embed(text: str, space: str = "tinyclip") -> dict[str, Any]:
+    """Text embedding ON the NPU, in the same space as this box's image embeddings.
+
+    space=tinyclip (default): 512-d, directly comparable with hailo_embed's image
+    vectors (text↔image similarity search over frames). space=siglip2: 768-d,
+    comparable only with the siglip2 image side used by hailo_zero_shot.
+    """
+    def _run():
+        v, truncated = _runtime.text_embed(text, space=space)
+        out = {"embedding": v, "dim": len(v), "space": space}
+        if truncated:
+            out["truncated"] = True  # only a prefix of the text was embedded
+        return out
+    return _guarded(_run)
+
+
+@mcp.tool()
+def hailo_zero_shot(
+    image_path: str,
+    labels: list[str],
+    space: str = "tinyclip",
+    template: str = "a photo of a {}",
+) -> dict[str, Any]:
+    """Zero-shot classification: score an image against free-text labels, both
+    towers on the NPU. space=tinyclip matches the deployed image-embedding
+    space; space=siglip2 uses the stronger siglip2 pair (73.0% vs 67.8% top-1).
+
+    Returns {"results": [{label, similarity, prob}...], "best": label} ranked.
+    """
+    def _run():
+        ranked = _runtime.zero_shot(Path(image_path), list(labels), space=space, template=template)
+        return {"results": ranked, "best": ranked[0]["label"] if ranked else None}
+    return _guarded(_run)
+
+
+@mcp.tool()
+def hailo_transcribe(audio_path: str, language: str = "en") -> dict[str, Any]:
+    """Speech-to-text ON the NPU: Whisper-base encoder+decoder HEFs (5 s chunks,
+    greedy decode, 60 s cap). The fast/preview tier — the GPU whisper seat
+    remains the quality path for long-form/timestamped work.
+
+    Returns {"text", "chunks", "language", "duration_sec"}.
+    """
+    def _run():
+        return _runtime.transcribe(Path(audio_path), language=language)
     return _guarded(_run)
 
 
