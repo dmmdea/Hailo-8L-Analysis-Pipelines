@@ -352,6 +352,10 @@ class HailoRuntime:
 
         params = hpf.VDevice.create_params()
         params.scheduling_algorithm = hpf.HailoSchedulingAlgorithm.ROUND_ROBIN
+        # SHARED group: lets whisper_npu's own InferModel VDevice (and any
+        # other well-behaved process) coexist with this one via the scheduler —
+        # the hailo-apps convention. Without it a second VDevice deadlocks.
+        params.group_id = "SHARED"
         self._vdevice = hpf.VDevice(params=params)
 
     def _configure_networks(self) -> None:

@@ -24,7 +24,7 @@ Everything here ran as a working, productive pipeline for thumbnail and image an
 | `hailo_segment(image_path, everything=)` | YOLOv8s-seg / FastSAM-s (raw head) | instance-id mask PNG; `everything=True` = class-agnostic |
 | `hailo_text_embed(text, space=)` | TinyCLIP text tower ON the NPU (or siglip2) | text vectors in the image-embedding space |
 | `hailo_zero_shot(image_path, labels)` | TinyCLIP or SigLIP2 pair, both towers on-NPU | free-text labels → ranked similarities |
-| `hailo_transcribe(audio_path)` | Whisper-base encoder+decoder HEFs | 5 s chunks, greedy decode, 60 s cap — fast tier |
+| `hailo_transcribe(audio_path)` | Whisper-base encoder+decoder HEFs | **PLATFORM-BLOCKED on Windows HailoRT 4.24** (both HEF builds time out; upstream validates Linux/RPi only) — the port is complete and returns a typed diagnosis; revisit on HailoRT 5.x Windows or Linux hosting |
 | `hailo_status()` | n/a | device + runtime state, safe to call with the driver down |
 
 Raw-head decoding (pose/seg/FastSAM) is the model zoo's own postprocessing math ported to

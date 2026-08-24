@@ -186,25 +186,31 @@ def transcribe_file(runtime: Any, audio_path: Path, language: str = "en") -> dic
     forced = [tid("<|startoftranscript|>"), tid(f"<|{language}|>"), tid("<|transcribe|>"), tid("<|notimestamps|>")]
     eos = tid("<|endoftext|>")
 
-    enc_hef, _ = runtime._require(HEF_WHISPER_ENCODER)
-    dec_hef, _ = runtime._require(HEF_WHISPER_DECODER)
+    runtime.ensure_initialized()
+    import hailo_platform as hpf
+
+    d = _models_dir()
+    enc_path, dec_path = d / HEF_WHISPER_ENCODER, d / HEF_WHISPER_DECODER
+    for p in (enc_path, dec_path):
+        if not p.exists():
+            raise HEFMissing(f"{p.name} not present in {d}")
+    enc_hef = hpf.HEF(str(enc_path))
+    dec_hef = hpf.HEF(str(dec_path))
     enc_in_shape = tuple(enc_hef.get_input_vstream_infos()[0].shape)
     chunk_frames = int(np.prod(enc_in_shape)) // 80  # e.g. 500 mel frames = 5 s
-    chunk_sec = chunk_frames // 100
+    chunk_sec = max(1, chunk_frames // 100)
     dec_name = dec_hef.get_network_group_names()[0]
-    dec_out_names = [n for n in dec_hef.get_sorted_output_names() if "conv" in n]
+    sorted_out = list(dec_hef.get_sorted_output_names())
+    dec_out_names = [n for n in sorted_out if "conv" in n]
     if not dec_out_names:
         # Guessing here would concatenate arbitrary tensors and argmax fluent
         # nonsense out of them — a wrong answer presented as success. Refuse.
         raise HailoDeviceError(
             "whisper decoder HEF has no 'conv'-named logit outputs — got "
-            f"{list(dec_hef.get_sorted_output_names())}; this port matches the hailo-apps "
+            f"{sorted_out}; this port matches the hailo-apps "
             "fixed-sequence-matmul-split decoder graph only"
         )
     seq_len = int(dec_hef.get_output_vstream_infos()[0].shape[1])
-    dec_in_names = [i.name for i in dec_hef.get_input_vstream_infos()]
-    enc_feed_name = next((n for n in dec_in_names if n.endswith("input_layer1")), dec_in_names[0])
-    tok_feed_name = next((n for n in dec_in_names if n.endswith("input_layer2")), dec_in_names[-1])
 
     audio = _improve(_load_audio(audio_path))
     duration = len(audio) / SAMPLE_RATE
@@ -212,48 +218,92 @@ def transcribe_file(runtime: Any, audio_path: Path, language: str = "en") -> dic
     seg_samples = chunk_sec * SAMPLE_RATE
     audio = audio[: MAX_DURATION_SEC * SAMPLE_RATE]
 
-    for start in range(0, len(audio), seg_samples):
-        chunk = audio[start : start + seg_samples]
-        if not chunk.size:
-            break
-        if len(chunk) < seg_samples:
-            chunk = np.pad(chunk, (0, seg_samples - len(chunk)))
-        mel = _log_mel(chunk, filters)  # (80, chunk_frames)
-        enc_feed = np.ascontiguousarray(mel.T.reshape((1, *enc_in_shape)).astype(np.float32))
-        enc_out = runtime._infer_multi(HEF_WHISPER_ENCODER, enc_feed, in_float=True)
-        encoded = np.asarray(next(iter(enc_out.values())), dtype=np.float32)
+    # Inference rides the InferModel API with explicit bindings on an OWN
+    # VDevice with group_id "SHARED" — the EXACT flow of the reference
+    # (hailo-apps whisper_pipeline.py). Two prior divergences both hung on
+    # device (measured 2026-08-23): InferVStreams timed out the encoder's
+    # streams, and create_infer_model on the runtime's legacy-configured
+    # VDevice deadlocked the scheduler. The runtime's VDevice is SHARED-group
+    # too, so the two coexist through the scheduler.
+    timeout_ms = 60_000  # a real bound — the reference's 1e8 ms turns any hang into forever
+    params = hpf.VDevice.create_params()
+    params.scheduling_algorithm = hpf.HailoSchedulingAlgorithm.ROUND_ROBIN
+    params.group_id = "SHARED"
+    vdevice = hpf.VDevice(params)
+    enc_model = vdevice.create_infer_model(str(enc_path))
+    dec_model = vdevice.create_infer_model(str(dec_path))
+    enc_model.input().set_format_type(hpf.FormatType.FLOAT32)
+    enc_model.output().set_format_type(hpf.FormatType.FLOAT32)
+    dec_model.input(f"{dec_name}/input_layer1").set_format_type(hpf.FormatType.FLOAT32)
+    dec_model.input(f"{dec_name}/input_layer2").set_format_type(hpf.FormatType.FLOAT32)
+    for name in sorted_out:
+        dec_model.output(name).set_format_type(hpf.FormatType.FLOAT32)
 
-        dec_ids = np.zeros((1, seq_len), dtype=np.int64)
-        for k, t in enumerate(forced):
-            dec_ids[0][k] = t
-        generated: list[int] = []
-        for i in range(len(forced) - 1, seq_len - 1):
-            gather = table[dec_ids]  # (1, seq, width)
-            add_output = gather + add_input
-            tok_embed = np.transpose(np.expand_dims(add_output, axis=0), (0, 2, 1, 3)).astype(np.float32)
-            out = runtime._infer_multi(
-                HEF_WHISPER_DECODER,
-                {enc_feed_name: encoded, tok_feed_name: np.ascontiguousarray(tok_embed)},
-                in_float=True,
-            )
-            parts = [np.asarray(out[n], dtype=np.float32).reshape((1, seq_len, -1)) for n in dec_out_names]
-            logits_all = np.concatenate(parts, axis=2)
-            vocab = tok.get_vocab_size(with_added_tokens=True)
-            if logits_all.shape[-1] < vocab:
-                raise HailoDeviceError(
-                    f"decoder logit width {logits_all.shape[-1]} < tokenizer vocab {vocab} "
-                    "— output concat is wrong for this HEF"
-                )
-            # A compiler may PAD the logit width past the vocab; argmax must
-            # never pick a padding column, so slice to the real vocab.
-            logits_all = logits_all[..., :vocab]
-            logits = _apply_repetition_penalty(logits_all[:, i], generated)
-            next_token = int(np.argmax(logits))
-            generated.append(next_token)
-            dec_ids[0][i + 1] = next_token
-            if next_token == eos:
+    with enc_model.configure() as enc_cfg, dec_model.configure() as dec_cfg:
+        enc_b = enc_cfg.create_bindings()
+        dec_b = dec_cfg.create_bindings()
+        for start in range(0, len(audio), seg_samples):
+            chunk = audio[start : start + seg_samples]
+            if not chunk.size:
                 break
-        texts.append(tok.decode([t for t in generated if t != eos], skip_special_tokens=True).strip())
+            if len(chunk) < seg_samples:
+                chunk = np.pad(chunk, (0, seg_samples - len(chunk)))
+            mel = _log_mel(chunk, filters)  # (80, chunk_frames)
+            # reference layout: (1, 1, frames, 80) NHWC via expand+transpose
+            input_mel = np.transpose(np.expand_dims(np.expand_dims(mel, 0), 2), (0, 2, 3, 1))
+            input_mel = np.ascontiguousarray(input_mel.astype(np.float32))
+            enc_b.input().set_buffer(input_mel)
+            enc_buf = np.zeros(enc_model.output().shape, dtype=np.float32)
+            enc_b.output().set_buffer(enc_buf)
+            try:
+                enc_cfg.run([enc_b], timeout_ms)
+            except Exception as e:  # HailoRTTimeout and friends
+                if "imeout" in type(e).__name__ or "imeout" in str(e):
+                    raise HailoDeviceError(
+                        "whisper encoder timed out on this platform. MEASURED 2026-08-23: both the "
+                        "model-zoo and hailo-apps whisper-base encoder HEFs time out on a minimal "
+                        "direct feed under Windows HailoRT 4.24 + Hailo-8L, while every vision HEF "
+                        "runs — upstream validates whisper on Linux/RPi (Windows whisper support "
+                        "exists only for Hailo-10H on HailoRT 5.x). PLATFORM-BLOCKED, not a host "
+                        "bug: revisit on a HailoRT 5.x Windows release with 8L whisper support or "
+                        "Linux hosting. The GPU whisper seat remains this box's STT path."
+                    ) from e
+                raise
+            encoded = np.ascontiguousarray(enc_b.output().get_buffer())
 
+            dec_ids = np.zeros((1, seq_len), dtype=np.int64)
+            for k, t in enumerate(forced):
+                dec_ids[0][k] = t
+            generated: list[int] = []
+            for i in range(len(forced) - 1, seq_len - 1):
+                gather = table[dec_ids]  # (1, seq, width)
+                add_output = gather + add_input
+                tok_embed = np.transpose(np.expand_dims(add_output, axis=0), (0, 2, 1, 3)).astype(np.float32)
+                dec_b.input(f"{dec_name}/input_layer1").set_buffer(encoded)
+                dec_b.input(f"{dec_name}/input_layer2").set_buffer(np.ascontiguousarray(tok_embed))
+                for name in sorted_out:
+                    dec_b.output(name).set_buffer(np.zeros(dec_model.output(name).shape, dtype=np.float32))
+                dec_cfg.run([dec_b], timeout_ms)
+                parts = [np.asarray(dec_b.output(n).get_buffer(), dtype=np.float32).reshape((1, seq_len, -1))
+                         for n in dec_out_names]
+                logits_all = np.concatenate(parts, axis=2)
+                vocab = tok.get_vocab_size(with_added_tokens=True)
+                if logits_all.shape[-1] < vocab:
+                    raise HailoDeviceError(
+                        f"decoder logit width {logits_all.shape[-1]} < tokenizer vocab {vocab} "
+                        "— output concat is wrong for this HEF"
+                    )
+                # A compiler may PAD the logit width past the vocab; argmax must
+                # never pick a padding column, so slice to the real vocab.
+                logits_all = logits_all[..., :vocab]
+                logits = _apply_repetition_penalty(logits_all[:, i], generated)
+                next_token = int(np.argmax(logits))
+                generated.append(next_token)
+                dec_ids[0][i + 1] = next_token
+                if next_token == eos:
+                    break
+            texts.append(tok.decode([t for t in generated if t != eos], skip_special_tokens=True).strip())
+
+    vdevice.release()
     text = clean_transcription(" ".join(t for t in texts if t))
     return {"text": text, "chunks": len(texts), "language": language, "duration_sec": round(duration, 2)}
