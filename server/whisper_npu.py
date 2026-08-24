@@ -164,6 +164,25 @@ def transcribe_file(runtime: Any, audio_path: Path, language: str = "en") -> dic
     except ImportError as e:
         raise DependencyMissing("the `tokenizers` package is not installed in the sidecar venv — pip install tokenizers") from e
 
+    # PLATFORM SHORT-CIRCUIT (measured 2026-08-23): under Windows HailoRT 4.24
+    # + Hailo-8L, BOTH whisper-base encoder builds time out on a minimal direct
+    # feed — and attempting the InferModel path can ABORT the hosting process
+    # natively (post-reboot verification: the transcribe attempt killed the
+    # sidecar). So on Windows this raises the typed diagnosis BEFORE any device
+    # work. Upstream validates whisper on Linux/RPi; Windows whisper support
+    # exists only for Hailo-10H on HailoRT 5.x. Remove this gate when a
+    # HailoRT 5.x Windows release adds 8L whisper support (or on Linux hosting,
+    # where the code below is the faithful hailo-apps port, ready to run).
+    import sys as _sys
+    if _sys.platform == "win32":
+        raise HailoDeviceError(
+            "whisper-on-NPU is PLATFORM-BLOCKED on Windows HailoRT 4.24 + Hailo-8L: both "
+            "encoder HEF builds time out (Linux/RPi-validated upstream; Windows whisper = "
+            "Hailo-10H + HailoRT 5.x), and the inference attempt can crash the host process. "
+            "The GPU whisper seat remains this box's STT path. Revisit on HailoRT 5.x "
+            "Windows with 8L whisper support or Linux hosting."
+        )
+
     if not audio_path.exists():
         raise FileNotFoundError(f"audio not found: {audio_path}")
     missing = required_assets(_models_dir())
