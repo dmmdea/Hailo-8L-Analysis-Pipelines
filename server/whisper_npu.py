@@ -30,6 +30,8 @@ from typing import Any
 
 import numpy as np
 
+from accel_activity import device_call
+
 SAMPLE_RATE = 16000
 N_FFT = 400
 HOP_LENGTH = 160
@@ -275,7 +277,8 @@ def transcribe_file(runtime: Any, audio_path: Path, language: str = "en") -> dic
             enc_buf = np.zeros(enc_model.output().shape, dtype=np.float32)
             enc_b.output().set_buffer(enc_buf)
             try:
-                enc_cfg.run([enc_b], timeout_ms)
+                with device_call():
+                    enc_cfg.run([enc_b], timeout_ms)
             except Exception as e:  # HailoRTTimeout and friends
                 if "imeout" in type(e).__name__ or "imeout" in str(e):
                     raise HailoDeviceError(
@@ -302,7 +305,8 @@ def transcribe_file(runtime: Any, audio_path: Path, language: str = "en") -> dic
                 dec_b.input(f"{dec_name}/input_layer2").set_buffer(np.ascontiguousarray(tok_embed))
                 for name in sorted_out:
                     dec_b.output(name).set_buffer(np.zeros(dec_model.output(name).shape, dtype=np.float32))
-                dec_cfg.run([dec_b], timeout_ms)
+                with device_call():
+                    dec_cfg.run([dec_b], timeout_ms)
                 parts = [np.asarray(dec_b.output(n).get_buffer(), dtype=np.float32).reshape((1, seq_len, -1))
                          for n in dec_out_names]
                 logits_all = np.concatenate(parts, axis=2)
