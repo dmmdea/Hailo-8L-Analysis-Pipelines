@@ -22,6 +22,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from accel_activity import timed_infer
+
 DEFAULT_MODELS_DIR = Path("/mnt/ai/hailo/models")
 
 HEF_FACE_DETECT = "scrfd_2.5g.hef"
@@ -478,7 +480,7 @@ class HailoRuntime:
         out_params = hpf.OutputVStreamParams.make_from_network_group(
             ng, quantized=False, format_type=hpf.FormatType.FLOAT32
         )
-        with hpf.InferVStreams(ng, in_params, out_params) as pipe:
+        with timed_infer(hpf.InferVStreams(ng, in_params, out_params)) as pipe:
             out = pipe.infer({in_info.name: tensor})
 
         # Decode 3 strides × 2 anchors per cell. Output name suffixes per Hailo HEF:
@@ -695,7 +697,7 @@ class HailoRuntime:
 
         top_beams_per_box: list[list[tuple[str, float]]] = []
 
-        with hpf.InferVStreams(ng_rec, in_params_rec, out_params_rec) as rec_pipe:
+        with timed_infer(hpf.InferVStreams(ng_rec, in_params_rec, out_params_rec)) as rec_pipe:
             for (x, y, w, h) in boxes_sorted:
                 if w < min_rec_side or h < min_rec_side:
                     continue
@@ -923,7 +925,7 @@ class HailoRuntime:
         out_params = hpf.OutputVStreamParams.make_from_network_group(
             ng_det, quantized=False, format_type=hpf.FormatType.FLOAT32
         )
-        with hpf.InferVStreams(ng_det, in_params, out_params) as pipe:
+        with timed_infer(hpf.InferVStreams(ng_det, in_params, out_params)) as pipe:
             out = pipe.infer({in_info_det.name: tensor})
 
         heatmap = np.asarray(out[out_info_det.name]).reshape(h_t, w_t)
@@ -980,7 +982,7 @@ class HailoRuntime:
         out_info = hef.get_output_vstream_infos()[0]
         in_p = hpf.InputVStreamParams.make_from_network_group(ng, quantized=True, format_type=hpf.FormatType.UINT8)
         out_p = hpf.OutputVStreamParams.make_from_network_group(ng, quantized=False, format_type=hpf.FormatType.FLOAT32)
-        with hpf.InferVStreams(ng, in_p, out_p) as pipe:
+        with timed_infer(hpf.InferVStreams(ng, in_p, out_p)) as pipe:
             raw = pipe.infer({in_info.name: tensor})
 
         # Output is a list of per-batch arrays shape (1, N_detections, 5).
@@ -1082,7 +1084,7 @@ class HailoRuntime:
         out_params = hpf.OutputVStreamParams.make_from_network_group(
             ng, quantized=True, format_type=hpf.FormatType.UINT8
         )
-        with hpf.InferVStreams(ng, in_params, out_params) as pipe:
+        with timed_infer(hpf.InferVStreams(ng, in_params, out_params)) as pipe:
             for y in ys:
                 for x in xs:
                     tile_rgb = cv2.cvtColor(
@@ -1123,7 +1125,7 @@ class HailoRuntime:
         out_params = hpf.OutputVStreamParams.make_from_network_group(
             ng, quantized=False, format_type=hpf.FormatType.FLOAT32
         )
-        with hpf.InferVStreams(ng, in_params, out_params) as pipe:
+        with timed_infer(hpf.InferVStreams(ng, in_params, out_params)) as pipe:
             output = pipe.infer({in_info.name: tensor})
         vector = np.asarray(output[out_info.name]).flatten().astype(float)
         return vector.tolist()
@@ -1163,7 +1165,7 @@ class HailoRuntime:
             quantized=quantized_out,
             format_type=hpf.FormatType.UINT8 if quantized_out else hpf.FormatType.FLOAT32,
         )
-        with hpf.InferVStreams(ng, in_p, out_p) as pipe:
+        with timed_infer(hpf.InferVStreams(ng, in_p, out_p)) as pipe:
             out = pipe.infer({in_info.name: tensor})
         # Every caller takes "the" output. If a swapped-in HEF has several heads,
         # dict order would silently pick one of them — refuse instead.
@@ -1412,7 +1414,7 @@ class HailoRuntime:
         if not isinstance(feed, dict):
             in_info = hef.get_input_vstream_infos()[0]
             feed = {in_info.name: feed}
-        with hpf.InferVStreams(ng, in_p, out_p) as pipe:
+        with timed_infer(hpf.InferVStreams(ng, in_p, out_p)) as pipe:
             return pipe.infer(feed)
 
     def pose(self, image_path: str | Path, score_threshold: float = 0.3) -> dict[str, Any]:

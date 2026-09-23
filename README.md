@@ -195,6 +195,37 @@ own driver is stable and the patch does not apply.
 Do not try to run this inside WSL2 on a Windows host: WSL2 has no PCIe passthrough, so the
 NPU is unreachable from the Linux side. Use the Windows HailoRT path above.
 
+## Device-busy activity file
+
+HailoRT 4.24 on Windows has no busy counter and `hailortcli monitor` is unsupported there,
+so nothing outside the process can tell how busy the 8L is. The process that runs inference
+therefore publishes it: every device call (`pipe.infer` on each `InferVStreams` pipe via the
+`timed_infer` proxy, and Whisper's `enc_cfg.run` / `dec_cfg.run`) is timed by
+`server/accel_activity.py`, and a daemon thread rewrites a duty-cycle file every 500 ms. Both
+the MCP server and the HTTP sidecar are covered, since both run inference through
+`hailo_runtime.py`.
+
+- **Where:** `$NVPAIR_ACCEL_ACTIVITY_DIR` if set; else `%ProgramData%\nvpair\accel-activity`
+  on Windows; else `/run/nvpair/accel-activity`, falling back to
+  `$XDG_RUNTIME_DIR/nvpair/accel-activity` when `/run` is not writable. File name `hailo.json`.
+- **Schema 1** (UTF-8 JSON, no BOM, all numbers integers):
+
+  ```json
+  {"schema":1,"device":"hailo-8l","pid":1234,"started_ms":1790000000000,
+   "updated_ms":1790000012345,"busy_ms":4321,"inflight":0}
+  ```
+
+  `busy_ms` is the cumulative wall time during which at least one device call was in flight
+  (overlapping calls count once), including the in-flight portion up to `updated_ms`,
+  measured on a monotonic clock; `started_ms`/`updated_ms` are epoch ms. A reader gets the
+  duty cycle from two samples: `Δbusy_ms / Δupdated_ms`.
+- **Lifecycle:** the writer starts on the first device call (a process that never inferred
+  writes no file) and makes a final write with `inflight: 0` at interpreter exit. Writes are
+  atomic (temp file + `os.replace`); a tick that collides with a reader holding the file open
+  is skipped and the next one catches up. The inference path only updates two counters under
+  a lock (about 2 µs per call); every file error is swallowed.
+- **Disable:** `HAILO_ACTIVITY_DISABLE=1` turns it off entirely (no thread, no file).
+
 ## License
 
 MIT
